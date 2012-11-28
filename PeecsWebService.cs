@@ -15,6 +15,8 @@ using System.Web;
 using System.Net;
 using System.Threading;
 using Styx.Common.Helpers;
+using System.Collections.Specialized;
+using System.Text;
 
 namespace com.peec.webservice
 {
@@ -85,9 +87,10 @@ namespace com.peec.webservice
                         return;
                     }
 
-                    web = new HttpServer(OnRequest, "http://" + webserviceHost + ":" + webservicePort + "/");
+                    web = new HttpServer(20);
+                    web.ProcessRequest += OnRequest;
                     
-                    web.Run();
+                    web.Start(webservicePort);
                     Logging.Write(string.Format("Listening on http://{0}:{1}/ for JSON request commands.. ", webserviceHost, webservicePort));
                     Logging.Write(string.Format("USING SECRET API KEY: {0}", secretKey));
 
@@ -106,57 +109,82 @@ namespace com.peec.webservice
 
 
         }
-        private void onStop(EventArgs args)
-        {
-            Logging.Write("OnStop : WebService");
 
+        public override void  Dispose()
+        {
+ 	         base.Dispose();
+            
             Styx.CommonBot.BotEvents.OnBotStopped -= onStop;
             Styx.CommonBot.BotEvents.OnBotStarted -= onStart;
-
+            Logging.Write("OnStop : WebService");
             if (web != null)
             {
                 web.Stop();
+                web = null;
+            }
+
+        }
+
+        private void onStop(EventArgs args)
+        {
+            Styx.CommonBot.BotEvents.OnBotStopped -= onStop;
+            Styx.CommonBot.BotEvents.OnBotStarted -= onStart;
+            if (web != null)
+            {
+                web.Stop();
+                web = null;
             }
         }
 
 
-        public string OnRequest(HttpListenerResponse response, HttpListenerRequest request)
+        public void OnRequest(HttpListenerContext ctx)
         {
+            string result = "{}";
+            HttpListenerResponse response = ctx.Response;
+            response.ContentType = "application/json";
+            response.ContentEncoding = Encoding.UTF8;
 
             try
             {
-                Boolean ok = false;
-                using (var streamReader = new StreamReader(request.InputStream))
+
+                var res = parseResult(ctx.Request.QueryString);
+                result = JSON.JsonEncode(res);
+
+                if (res != null && result != null)
                 {
-                    string reqString = streamReader.ReadToEnd();
-                    if (reqString == "")
-                    {
-                        ok = false;
-                    }
-                    else
-                    {
-
-                        var req = (Hashtable)JSON.JsonDecode(reqString);
-                        ok = parseResult(req);
-                    }
+                    response.StatusCode = 200;
                 }
-                response.StatusCode = ok ? 200 : 400;
-                response.ContentType = "text/json";
-                Dictionary<string, string> data = new Dictionary<string, string>();
-                data["ok"] = ok + "";
-
-                return JSON.JsonEncode(data);
+                else
+                {
+                    throw new Exception("Request is invalid.");
+                }
+                
             }
             catch (Exception e)
             {
                 response.StatusCode = 400;
-                response.ContentType = "text/json";
+                
                 Dictionary<string, string> data = new Dictionary<string, string>();
                 data["ok"] = "false";
                 Logging.Write(string.Format("Error {0} stack: {1}", e.Message, e.StackTrace));
-                return JSON.JsonEncode(data);
+                result = JSON.JsonEncode(data);
             }
-            
+
+            // Support JSONP.
+            string callback = ctx.Request.QueryString.Get("callback");
+            if (callback != null)
+            {
+                result = callback+"("+result+")";
+                response.ContentType = "application/javascript";
+            }
+
+
+            byte[] buffer = Encoding.UTF8.GetBytes(result);
+            response.ContentLength64 = buffer.Length;
+            response.OutputStream.Write(buffer, 0, buffer.Length);
+            response.OutputStream.Close();
+            response.Close();
+
         }
 
 
@@ -208,29 +236,20 @@ namespace com.peec.webservice
             try
             {
 
-                Dictionary<string, Dictionary<string, string>> reqData = new Dictionary<string, Dictionary<string, string>>();
-                reqData["meta"]["secretKey"] = this.secretKey;
-                reqData["meta"]["apiVersion"] = this.Version.ToString();
-                
-                reqData["result"] = data;
+                Dictionary<string, string> reqData = new Dictionary<string, string>();
+                reqData["secretKey"] = this.secretKey;
+                reqData["apiVersion"] = this.Version.ToString();
+                foreach(string key in data.Keys){
+                    reqData[key] = data[key];
+                }
 
                 WebRequest req = HttpWebRequest.Create(new Uri(this.webserviceUrl));
                 req.Method = "POST";
-                req.ContentType = "text/json";
+                req.ContentType = "application/json";
                 using(var streamWriter = new StreamWriter(req.GetRequestStream())){
                     streamWriter.Write(JSON.JsonEncode(reqData));
                     streamWriter.Flush();
                     streamWriter.Close();
-                }
-                var resp = (HttpWebResponse)req.GetResponse();
-                if (resp.StatusCode != HttpStatusCode.OK)
-                {
-                    Logging.Write(string.Format("Response was not status code 200, but {0}, could not parse response. Service should return 200 if success.", resp.StatusCode.ToString()));
-                }
-                using (var streamReader = new StreamReader(resp.GetResponseStream()))
-                {
-                    var result = (Hashtable)JSON.JsonDecode(streamReader.ReadToEnd());
-                    return parseResult(result);
                 }
             }
             catch (WebException e)
@@ -241,35 +260,45 @@ namespace com.peec.webservice
 		}
 
 
-        public Boolean parseResult(Hashtable res)
+        public Dictionary<string, string> parseResult(NameValueCollection res)
         {
-            if (res == null)
-            {
-                Logging.Write("Error, got invalid request / response, should be valid JSON.");
-            }
 
             if ((string)res["secretKey"] == "" || (string)res["secretKey"] != this.secretKey){
                 Logging.Write("Response is invalid. Must be of type JSON and include \"secretKey\" with the corresponding secret key.");
-                return false;
+                return null;
             }
             if ((string)res["apiVersion"] == "" || (string)res["apiVersion"] != this.Version.ToString())
             {
                 Logging.Write("Response is invalid. Must be of type JSON and include correct \"apiVersion\". Current API VERSION is " + Version.ToString());
-                return false;
+                return null;
             }
 
+
+
+
+            Dictionary<string, string> reqData = new Dictionary<string, string>();
+            
+            reqData["secretKey"] = this.secretKey;
+            reqData["apiVersion"] = this.Version.ToString();
+
+            Dictionary<string, string> result = new Dictionary<string, string>();
             switch ((string)res["cmd"])
             {
                 default:
                     Logging.Write(string.Format("No support for cmd: {0}", (string)res["cmd"]));
+                    return null;
+                case "stats":
+                    result = readAllData();
                     break;
-                // Simple ok response.
-                case "ok":
-                    return true;
-                // TODO.
+            }
+            
+            foreach (string key in result.Keys)
+            {
+                reqData[key] = result[key];
             }
 
-            return false;
+
+            return reqData;
         }
 		
 		

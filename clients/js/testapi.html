@@ -1,0 +1,122 @@
+﻿<!doctype html>
+<html>
+	<head>
+		<meta charset="utf-8" />
+		<title>API Tests</title>
+		<script src="http://ajax.googleapis.com/ajax/libs/jquery/1.8.0/jquery.min.js" type="text/javascript"></script>
+		
+		
+		<script type="text/javascript">
+		
+			var HonorbuddyAPI = function(apiLocation, secretKey, apiVersion, successCallback, errorCallback){
+				this.apiLocation = apiLocation;
+				this.secretKey = secretKey;
+				this.apiVersion = apiVersion;
+				this.successCallback = successCallback;
+				this.errorCallback = errorCallback;
+				
+				
+				this.getStats = function(){
+					this.run("stats");
+				};
+				
+				this.run = function(cmd){
+					var that = this;
+					
+					var params = {
+							"cmd": cmd,
+							"secretKey": that.secretKey,
+							"apiVersion": that.apiVersion
+						};
+					var strParams = "";
+					$.each(params, function(k, v){
+						strParams +=  "&" + k + "=" + v;
+					});
+					
+					$('#requestSent').text(that.apiLocation + strParams);
+					
+					$.ajax({  
+						
+						url: that.apiLocation,
+						data: params,
+						dataType: 'jsonp',
+						success: that.successCallback,
+						error: that.errorCallback
+					});
+					
+					
+				}
+				
+			};
+			
+			
+			var api = new HonorbuddyAPI("http://localhost:9097?callback=?", "yours33cretk333yyy", "0.0.2", 
+			// Success callback.
+			function(data){
+				$("#result").val(JSON.stringify(data));
+				var html = $("<ul></ul>");
+				$.each(data, function(k, v){
+					html.append("<li><strong>"+k+": </strong> "+v+"</li>");
+				});
+				$("#datamapped").html(html);
+				
+			}, 
+			// Error callback..
+			function(jqXHR, textStatus, errorThrown){
+				console.log("error " + textStatus);
+				console.log(jqXHR.responseText);
+			});
+			
+			
+			$(function(){
+				$('.apiLookup').click(function(){
+					switch($(this).data('cmd')){
+					case "stats":
+						api.getStats();
+					break;
+					}
+				});
+			});
+			
+		
+		</script>
+		<style type="text/css">
+			.col{
+				width: 400px;
+				float:left;
+			}
+			#requestSent{ color: red }
+		</style>
+	</head>
+
+	<body>
+		<h2>Apis:</h2>
+		<table border="1">
+			<tr>
+				<th>Type</th><th>Description</th><th>Test API</th>
+			</tr>
+			<tr>
+				<th>Stats</th>
+				<td>Returns various stats</td>
+				<td><a href="#" class="apiLookup" data-cmd="stats">TEST</a></td>
+			</tr>
+		</table>
+	
+	
+		<h3>Request sent: <span id="requestSent"></span></h3>
+		
+		<div>
+			<div class="col">
+				<h2>JSON Result:</h2>
+				<textarea style="width: 100%; height: 400px;" id="result"></textarea>
+			</div>
+			<div class="col">
+				<h2>Data got back:</h2>
+				<div id="datamapped"></div>
+			</div>
+		</div>
+	</body>
+	
+	
+	
+</html>

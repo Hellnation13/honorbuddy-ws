@@ -2,6 +2,8 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Collections.Specialized;
+using System.Text.RegularExpressions;
 
 namespace com.peec.webservice
 {
@@ -23,5 +25,6 @@ namespace com.peec.webservice
                 return builder.ToString().ToLower();
             return builder.ToString();
         }
+
     }
 }
