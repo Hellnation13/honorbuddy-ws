@@ -34,46 +34,28 @@ namespace com.peec.webservice
             new FormSettings().ShowDialog();
         }
 
-        private readonly WaitTimer _itemCheckTimer = WaitTimer.TenSeconds;
+        
         private HttpServer web;
 
         // Configuration 
-        private string secretKey = "MY_SECRET_KEY";
-        
-        private string webserviceUrl = "http://localhost/api"; // Update server.
-        
-        // Request server
-        private int webservicePort = 9096; 
-        private bool enabledPostback = false;
+        private string apiKey = "MY_SECRET_KEY";
+        private int webservicePort = 9096;
         private string webserviceHost = "localhost";
-		// How often to send requests.
-		const int PUSH_WAIT_TIME = 20;
+		
         
+
+
 
         public override void Initialize()
         {
 
             Logging.Write("Init : WebService");
 
-            Styx.CommonBot.BotEvents.OnBotStopped += onStop;
-            Styx.CommonBot.BotEvents.OnBotStarted += onStart;
-
-        }
-
-        
-
-        private void onStart(EventArgs args)
-        {
-            Logging.Write("OnStart : WebService");
-
-
-            this.secretKey = WSSettings.Instance.apikey;
-            this.webserviceUrl = WSSettings.Instance.apiurl;
+            this.apiKey = WSSettings.Instance.apikey;
             this.webservicePort = WSSettings.Instance.webport;
             this.webserviceHost = WSSettings.Instance.weburl;
-            this.enabledPostback = WSSettings.Instance.enablePostback;
 
-            Logging.Write(string.Format("Starting Webservice Plugin. Using postback: {0}, using webserver: {1}", this.enabledPostback, WSSettings.Instance.enableWebserver));
+
 
             if (WSSettings.Instance.enableWebserver)
             {
@@ -89,50 +71,37 @@ namespace com.peec.webservice
 
                     web = new HttpServer(20);
                     web.ProcessRequest += OnRequest;
-                    
+
                     web.Start(webservicePort);
                     Logging.Write(string.Format("Listening on http://{0}:{1}/ for JSON request commands.. ", webserviceHost, webservicePort));
-                    Logging.Write(string.Format("USING SECRET API KEY: {0}", secretKey));
+                    Logging.Write(string.Format("USING SECRET API KEY: {0}", apiKey));
 
                 }
                 catch (Exception e)
                 {
+                    
                     Logging.Write(string.Format("Error {0} stack: {1}", e.Message, e.StackTrace));
                 }
-                
-            }
 
-            if (enabledPostback)
-            {
-                Logging.Write(string.Format("Posting stats and actions to API: {0} . ", this.webserviceUrl));
             }
-
 
         }
+
+
+
 
         public override void  Dispose()
         {
- 	         base.Dispose();
-            
-            Styx.CommonBot.BotEvents.OnBotStopped -= onStop;
-            Styx.CommonBot.BotEvents.OnBotStarted -= onStart;
-            Logging.Write("OnStop : WebService");
+ 	        base.Dispose();
+
             if (web != null)
             {
                 web.Stop();
-                web = null;
-            }
-
-        }
-
-        private void onStop(EventArgs args)
-        {
-            Styx.CommonBot.BotEvents.OnBotStopped -= onStop;
-            Styx.CommonBot.BotEvents.OnBotStarted -= onStart;
-            if (web != null)
-            {
-                web.Stop();
-                web = null;
+                while (web.isListening())
+                {
+                    Thread.Sleep(1000);
+                    Logging.Write("Waiting on webserver to stop.");
+                }
             }
         }
 
@@ -166,6 +135,7 @@ namespace com.peec.webservice
                 
                 Dictionary<string, string> data = new Dictionary<string, string>();
                 data["ok"] = "false";
+                data["error"] = e.Message;
                 Logging.Write(string.Format("Error {0} stack: {1}", e.Message, e.StackTrace));
                 result = JSON.JsonEncode(data);
             }
@@ -190,20 +160,26 @@ namespace com.peec.webservice
 
         
 		public override void Pulse(){
-            if (!_itemCheckTimer.IsFinished)
-                return;
-
-            Logging.Write("Pulse : WebService" + Version.ToString());
-
-            _itemCheckTimer.Reset();
-
-            if (this.enabledPostback) pushData(readAllData());
-		}
-		
-		public Dictionary<string,string> readAllData(){
-            Dictionary<string, string> data = new Dictionary<string, string>();
-            try
+            if (WSSettings.Instance.restart)
             {
+                WSSettings.Instance.restart = false;
+                Thread thread = new Thread(delegate() {
+                    web.Stop();
+                    while (web.isListening()) { 
+                        Thread.Sleep(1000);
+                        Logging.Write("Waiting on webserver to stop.");
+                    }
+                    Logging.Write("Starting new webserver.");
+                    Initialize();
+                    
+                });
+                thread.Start();
+                
+            }
+        }
+		
+		public Dictionary<string,string> getStats(){
+            Dictionary<string, string> data = new Dictionary<string, string>();
                 using (Styx.StyxWoW.Memory.AcquireFrame())
                 {
 
@@ -222,55 +198,21 @@ namespace com.peec.webservice
                     data["nodeh"] = JSON.JsonEncode(Bots.Gatherbuddy.GatherbuddyBot.NodeCollectionCount);
 
                 }
-            }
-            catch (Exception e)
-            {
-               Logging.Write(string.Format("Error {0} stack: {1}", e.Message, e.StackTrace));
-            }
 
             return data;
 		}
 
-		
-		public Boolean pushData(Dictionary<string, string> data){
-            try
-            {
-
-                Dictionary<string, string> reqData = new Dictionary<string, string>();
-                reqData["secretKey"] = this.secretKey;
-                reqData["apiVersion"] = this.Version.ToString();
-                foreach(string key in data.Keys){
-                    reqData[key] = data[key];
-                }
-
-                WebRequest req = HttpWebRequest.Create(new Uri(this.webserviceUrl));
-                req.Method = "POST";
-                req.ContentType = "application/json";
-                using(var streamWriter = new StreamWriter(req.GetRequestStream())){
-                    streamWriter.Write(JSON.JsonEncode(reqData));
-                    streamWriter.Flush();
-                    streamWriter.Close();
-                }
-            }
-            catch (WebException e)
-            {
-                Logging.Write(string.Format("Error {0} stack: {1}", e.Message, e.StackTrace));
-            }
-            return false;
-		}
-
-
         public Dictionary<string, string> parseResult(NameValueCollection res)
         {
 
-            if ((string)res["secretKey"] == "" || (string)res["secretKey"] != this.secretKey){
+            if ((string)res["secretKey"] == "" || (string)res["secretKey"] != this.apiKey){
                 Logging.Write("Response is invalid. Must be of type JSON and include \"secretKey\" with the corresponding secret key.");
-                return null;
+                throw new Exception("Could not authenticate this key.");
             }
             if ((string)res["apiVersion"] == "" || (string)res["apiVersion"] != this.Version.ToString())
             {
                 Logging.Write("Response is invalid. Must be of type JSON and include correct \"apiVersion\". Current API VERSION is " + Version.ToString());
-                return null;
+                throw new Exception(string.Format("Wrong API version of client ({0}), current server API version is: {1}.", res["apiVersion"], Version.ToString()));
             }
 
 
@@ -278,7 +220,7 @@ namespace com.peec.webservice
 
             Dictionary<string, string> reqData = new Dictionary<string, string>();
             
-            reqData["secretKey"] = this.secretKey;
+            reqData["secretKey"] = this.apiKey;
             reqData["apiVersion"] = this.Version.ToString();
 
             Dictionary<string, string> result = new Dictionary<string, string>();
@@ -288,8 +230,32 @@ namespace com.peec.webservice
                     Logging.Write(string.Format("No support for cmd: {0}", (string)res["cmd"]));
                     return null;
                 case "stats":
-                    result = readAllData();
+                    result = getStats();
                     break;
+                case "start":
+                    if (Styx.CommonBot.TreeRoot.IsRunning)
+                    {
+                        throw new Exception("Bot is currently running.");
+                    }
+                    else
+                    {
+                        Styx.CommonBot.TreeRoot.Start();
+                        result.Add("success", "Bot started.");
+                    }
+                    break;
+                case "stop":
+                    if (!Styx.CommonBot.TreeRoot.IsRunning)
+                    {
+                        throw new Exception("Bot is not running.");
+                    }
+                    else
+                    {
+                        Styx.CommonBot.TreeRoot.Stop();
+                        result.Add("success", "Bot stopped.");
+                    }
+                    break;
+
+
             }
             
             foreach (string key in result.Keys)

@@ -27,6 +27,12 @@ namespace com.peec.webservice
             _listenerThread = new Thread(HandleRequests);
         }
 
+        public bool isListening()
+        {
+            return _listener.IsListening;
+        }
+
+
         public void Start(int port)
         {
             _listener.Prefixes.Add(String.Format(@"http://+:{0}/", port));

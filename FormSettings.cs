@@ -28,14 +28,9 @@ namespace com.peec.webservice
                 ((WSSettings)pgSettings.SelectedObject).Save();
         }
 
-        private void f_secretKey_TextChanged(object sender, EventArgs e)
+        private void button1_Click(object sender, EventArgs e)
         {
-
-        }
-
-        private void FormSettings_Load_1(object sender, EventArgs e)
-        {
-
+            ((WSSettings)pgSettings.SelectedObject).restart = true;
         }
 
     }

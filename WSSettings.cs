@@ -28,21 +28,8 @@ namespace com.peec.webservice
         [Category("General")]
         [DisplayName("API Key")]
         [DefaultValue("yours33cretk333yyy")]
+        [Description("This is used as your secret key, set it to what you want.")]
         public string apikey { get; set; }
-
-
-        [Setting]
-        [Category("API Postback")]
-        [DefaultValue(false)]
-        [DisplayName("Enabled?")]
-        [Description("Requires a webservice that follows the format of this API. It will postback to the API Url with updated info once every 20 seconds.")]
-        public Boolean enablePostback { get; set; }
-
-        [Setting]
-        [Category("API Postback")]
-        [DisplayName("API Url")]
-        [DefaultValue("http://yourstatsserver.com/api")]
-        public string apiurl { get; set; }
 
 
 
@@ -64,9 +51,10 @@ namespace com.peec.webservice
         [DisplayName("Webserver PORT")]
         [DefaultValue(9097)]
         public int webport { get; set; }
-        
 
 
+
+        public bool restart = false;
 
     }
 }
