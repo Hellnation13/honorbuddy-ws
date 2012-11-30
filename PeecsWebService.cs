@@ -19,6 +19,7 @@ using System.Collections.Specialized;
 using System.Text;
 using System.Net.NetworkInformation;
 using System.Runtime.Serialization;
+using Styx.WoWInternals.WoWObjects;
 
 namespace com.peec.webservice
 {
@@ -31,6 +32,9 @@ namespace com.peec.webservice
         public override string Name { get { return "Peecs WebService"; } }
         public override System.Version Version { get { return new Version(0, 0, 2); } }
         public override bool WantButton { get { return true; } }
+
+        private LocalPlayer Me { get { return Styx.StyxWoW.Me; } }
+
         public override void OnButtonPress()
         {
             new FormSettings().ShowDialog();
@@ -39,6 +43,7 @@ namespace com.peec.webservice
         
         static HttpServer web;
         private List<ChatLog> chatLogs;
+        private String WoWPath;
 
         // Configuration 
         private string apiKey;
@@ -62,10 +67,18 @@ namespace com.peec.webservice
             Chat.Raid += QueueChat;
             Chat.RaidLeader += QueueChat;
 
+
+            Styx.CommonBot.BotEvents.OnBotStopped -= OnStop;
+            Styx.CommonBot.BotEvents.OnBotStarted -= OnStart;
+
             Logging.Write("Init : WebService");
             startServer();
 
-            
+
+
+            WoWPath = Path.GetDirectoryName(Styx.StyxWoW.Memory.Process.MainModule.FileName);
+
+
 
         }
         public override void Dispose()
@@ -89,8 +102,20 @@ namespace com.peec.webservice
 
         }
 
+        public void OnStart(EventArgs args)
+        {
+            chatLogs.Clear();
+        }
+        public void OnStop(EventArgs args)
+        {
+            chatLogs.Clear();
+        }
+
+
+
+
         private DirectoryInfo getScreenshotDir(){
-            return new DirectoryInfo(WSSettings.Instance.WoWPath + "\\Screenshots\\");
+            return new DirectoryInfo(WoWPath + "\\Screenshots\\");
         }
 
 
@@ -188,7 +213,7 @@ namespace com.peec.webservice
             if (img != null)
             {
                 response.StatusCode = 200;
-                img = WSSettings.Instance.WoWPath + "\\Screenshots\\" + img;
+                img = WoWPath + "\\Screenshots\\" + img;
                     
                 response.ContentType = "image/jpeg";
                 buffer = System.IO.File.ReadAllBytes(img);
@@ -233,7 +258,6 @@ namespace com.peec.webservice
                 data["ok"] = false;
                 data["error"] = e.Message;
                 data["result"] = new Hashtable();
-                Logging.Write(string.Format("Error {0} stack: {1}", e.Message, e.StackTrace));
                 result = JSON.JsonEncode(data);
             }
 
@@ -274,20 +298,60 @@ namespace com.peec.webservice
             Hashtable data = new Hashtable();
                 using (Styx.StyxWoW.Memory.AcquireFrame())
                 {
+
+                    Hashtable me = new Hashtable();
+                    me["Level"] = Me.Level;
+                    me["Experience"] = Me.Experience;
+                    me["Copper"] = Me.Copper;
+                    me["NextLevelExperience"] = Me.NextLevelExperience;
+                    me["Durability"] = Me.Durability;
+                    me["DurabilityPercent"] = Me.DurabilityPercent;
+                    me["FreeBagSlots"] = Me.FreeBagSlots;
+
+                    Hashtable items = new Hashtable();
+                    List<WoWItem> its = Me.BagItems;
+                    for (int i = 0; i < its.Count; i++ )
+                    {
+                        items[its[i].Entry] = its[i].StackCount;
+                    }
+                    me["BagItems"] = items;
+
+                    Hashtable items2 = new Hashtable();
+                    WoWItem[] equipped = Me.Inventory.Equipped.Items;
+                    for (int i = 0; i < equipped.Length; i++)
+                    {
+                        if (equipped[i] != null) items2[equipped[i].Entry] = equipped[i].DurabilityPercent;
+                    }
+                    me["EquippedItems"] = items2;
+
+
                     
-                    data["Level"] = Styx.StyxWoW.Me.Level;
-                    data["Experience"] = Styx.StyxWoW.Me.Experience;
-                    data["NextLevelExperience"] = Styx.StyxWoW.Me.NextLevelExperience;
-                    data["XPPerHour"] = Styx.CommonBot.GameStats.XPPerHour;
-                    data["TimeToLevel"] = Styx.CommonBot.GameStats.TimeToLevel.TotalSeconds;
-                    data["MobsKilled"] = Styx.CommonBot.GameStats.MobsKilled;
-                    data["MobsPerHour"] = Styx.CommonBot.GameStats.MobsPerHour;
-                    data["HonorGained"] = Styx.CommonBot.GameStats.HonorGained;
-                    data["HonorPerHour"] = Styx.CommonBot.GameStats.HonorPerHour;
-                    data["BGsWon"] = Styx.CommonBot.GameStats.BGsWon;
-                    data["BGsLost"] = Styx.CommonBot.GameStats.BGsLost;
-                    data["Copper"] = Styx.StyxWoW.Me.Copper;
-                    data["NodeCollectionCount"] = Bots.Gatherbuddy.GatherbuddyBot.NodeCollectionCount;
+
+                    Hashtable loc = new Hashtable();
+                    loc["X"] = Me.X;
+                    loc["Y"] = Me.Y;
+                    loc["Z"] = Me.Z;
+                    loc["ZoneText"] = Me.ZoneText;
+
+                    me["WorldLocation"] = loc;
+
+                    data["Me"] = me;
+
+                    Hashtable stats = new Hashtable();
+                    stats["XPPerHour"] = Styx.CommonBot.GameStats.XPPerHour;
+                    stats["TimeToLevel"] = Styx.CommonBot.GameStats.TimeToLevel.TotalSeconds;
+                    stats["MobsKilled"] = Styx.CommonBot.GameStats.MobsKilled;
+                    stats["MobsPerHour"] = Styx.CommonBot.GameStats.MobsPerHour;
+                    stats["HonorGained"] = Styx.CommonBot.GameStats.HonorGained;
+                    stats["HonorPerHour"] = Styx.CommonBot.GameStats.HonorPerHour;
+                    stats["BGsWon"] = Styx.CommonBot.GameStats.BGsWon;
+                    stats["BGsLost"] = Styx.CommonBot.GameStats.BGsLost;
+                    data["GameStats"] = stats;
+
+                    Hashtable gb = new Hashtable();
+                    gb["NodeCollectionCount"] = Bots.Gatherbuddy.GatherbuddyBot.NodeCollectionCount;
+                    data["Gatherbuddy"] = gb;
+
 
                 }
 
@@ -383,10 +447,13 @@ namespace com.peec.webservice
                     }
                     else
                     {
-                        list = chatLogs.FindAll(delegate(ChatLog cl) { return cl.EventName  == res["type"]; });
+                        list = chatLogs.FindAll(delegate(ChatLog cl) { return cl.EventName == res["EventName"]; });
                     }
-                    
+
+                    list.Sort((x, y) => x.FireTimeStamp.CompareTo(y.FireTimeStamp));
+
                     for(int i=0; i < list.Count; i++){
+                        if (i > 200) continue;
                         ChatLog l = list[i];
                         Hashtable listing = new Hashtable();
                         listing["EventName"] = l.EventName;
@@ -427,7 +494,6 @@ namespace com.peec.webservice
 
         private void QueueChat(Styx.CommonBot.Chat.ChatLanguageSpecificEventArgs e)
         {
-            Logging.Write("Queue chat..." + e.EventName);
             chatLogs.Add(new ChatLog(e.EventName, e.Author, e.Message, e.FireTimeStamp));
         }
 

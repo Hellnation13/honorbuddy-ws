@@ -46,11 +46,6 @@ namespace com.peec.webservice
         [DefaultValue(9099)]
         public int webport { get; set; }
 
-        [Setting]
-        [Category("WoW")]
-        [DisplayName("Path to WoW folder")]
-        [DefaultValue("C:\\Program Files\\World of Warcraft")]
-        public string WoWPath { get; set; }
 
     }
 }
