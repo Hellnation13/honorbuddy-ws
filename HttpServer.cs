@@ -105,5 +105,18 @@ namespace com.peec.webservice
         }
 
         public event Action<HttpListenerContext> ProcessRequest;
+
+        public static void SendResponse(HttpListenerResponse response, byte[] buffer)
+        {
+            response.ContentLength64 = buffer.Length;
+            response.OutputStream.Write(buffer, 0, buffer.Length);
+            response.OutputStream.Close();
+            response.Close();
+        }
+
+        public static void SendResponse(HttpListenerResponse response, String str)
+        {
+            SendResponse(response, Encoding.UTF8.GetBytes(str));
+        }
     }
 }

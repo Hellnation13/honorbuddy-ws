@@ -19,9 +19,16 @@
 				
 				/* Me API */
 				var me = function(){};
-				me.getStats = function(sHandler, eHandler){
-					that.run("me:stats", sHandler, eHandler);
-				}
+				me.getPlayerInfo = function(sHandler, eHandler){
+					that.run("me:playerInfo", sHandler, eHandler);
+				};
+				me.getGameStats = function(sHandler, eHandler){
+					that.run("me:gameStats", sHandler, eHandler);
+				};
+				me.getItems = function(sHandler, eHandler){
+					that.run("me:items", sHandler, eHandler);
+				};
+				
 				this.me = me;
 				
 				/* Bot API*/
@@ -65,6 +72,8 @@
 				};
 				this.chat = chat;
 				
+				
+				/* Generic Run command */
 				this.run = function(cmd, sHandler, eHandler, extras){
 					
 					var params = {
@@ -79,7 +88,7 @@
 					this.onBeforeRun(params);
 					
 					var req = $.ajax({
-						url: this.apiLocation,
+						url: this.apiLocation + (this.useJsonp ? "?callback=?" : ""),
 						data: params,
 						dataType: this.useJsonp ? "jsonp" : "json"
 					});
@@ -105,7 +114,7 @@
 				}
 				
 				this.setApiLocation = function(loc){
-					this.apiLocation = loc + "?callback=?";
+					this.apiLocation = loc;
 				};
 				
 				/**
@@ -175,6 +184,12 @@
 					}
 				);
 				
+				
+				
+				$('.serverHost').text(api.apiLocation);
+				
+				
+				
 				api.onBeforeRun = function(params){
 					var strParams = "";
 					$.each(params, function(k, v){
@@ -187,6 +202,7 @@
 				
 				$("#serverInformation").change(function(){
 					api.setApiLocation($(this).val());
+					$('.serverHost').text(api.apiLocation);
 				});
 				$("#apiVersion").change(function(){
 					api.apiVersion = $(this).val();
@@ -199,8 +215,14 @@
 					$("#result").val("");
 					$("#datamapped").text("");
 					switch($(this).data('cmd')){
-					case "me:stats":
-						api.me.getStats();
+					case "me:playerInfo":
+						api.me.getPlayerInfo();
+					break;
+					case "me:gameStats":
+						api.me.getGameStats();
+					break;
+					case "me:items":
+						api.me.getItems();
 					break;
 					case "bot:stop":
 						api.bot.stop();
@@ -265,95 +287,122 @@
 		
 		</script>
 		<style type="text/css">
+			body{ background-color: #ccc; margin: 0; padding; 0;}
+			#header { padding-top: 20px; padding-bottom: 20px; border-bottom: 1px #ccc dashed; }
+			#header h1{ margin: 0; font-size: 40pt; padding: 10px;}
+			
+			#header h1 span{ font-size: 0.5em;}
+			#header p{ font-size: 19pt; font-style: italic; margin: 0 0 0 30px; color: gray; }
+			#wrapper{ background-color: #fff; width: 1024px; padding-left: 20px; padding-right: 20px; margin-left: auto; margin-right: auto; }
 			.col{
-				width: 400px;
+				width: 45%;
 				float:left;
 			}
+			.row{ overflow: auto; width: 100%; }
 			#requestSent{ color: red }
 		</style>
 	</head>
 
 	<body>
-		<p>This client is for testing against Peecs Webservice for Honorbuddy. Set the correct Server INFO based on your settings for Peecs Webservice.</p>
 	
-		<h2>Server INFO:</h2>
-			<strong>Connection</strong> <input type="text" id="serverInformation" value="http://localhost:9097" /><br />
-			<strong>Version API</strong> <input type="text" id="apiVersion" value="0.0.2" /><br />
-			<strong>API Key</strong> <input type="text" id="apiKey" value="yours33cretk333yyy" /><br />
-		<h2>Apis:</h2>
-		<table border="1">
-			<tr>
-				<th>Type</th><th>Description</th><th>Test API</th>
-			</tr>
-			<tr>
-				<th>stats</th>
-				<td>Returns various stats</td>
-				<td><a href="#" class="apiLookup" data-cmd="me:stats">Get stats</a></td>
-			</tr>
-			<tr>
-				<th>bot:start</th>
-				<td>Starts the bot</td>
-				<td><a href="#" class="apiLookup" data-cmd="bot:start">Start bot</a></td>
-			</tr>
-			<tr>
-				<th>bot:stop</th>
-				<td>Stops the bot</td>
-				<td><a href="#" class="apiLookup" data-cmd="bot:stop">Stop bot</a></td>
-			</tr>
-			<tr>
-				<th>bot:isRunning</th>
-				<td>Checks if the bot is started.</td>
-				<td><a href="#" class="apiLookup" data-cmd="bot:isRunning">Check if running bot</a></td>
-			</tr>
-			<tr>
-				<th>game:getScreenshots</th>
-				<td>Gets all the screenshots URLS + names.</td>
-				<td><a href="#" class="apiLookup" data-cmd="game:getScreenshots">Get all screenshots</a></td>
-			</tr>
-			<tr>
-				<th>game:takeScreenshot</th>
-				<td>Takes a screenshot, delivers url + name of sreenshot back.</td>
-				<td><a href="#" class="apiLookup" data-cmd="game:takeScreenshot">Take a screenshot</a></td>
-			</tr>
-			<tr>
-				<th>chat:send</th>
-				<td>Sends a message in-game.<br />
-					<p>Message: <textarea id="chat_msg">yup..</textarea></p>
-					<p>chatType: <input type="text" id="chat_chatType" value="SAY" /></p>
-					<p>Language: <input type="text" id="chat_language" value="" /></p>
-					<p>Channel: <input type="text" id="chat_channel" value="" /></p>
-				</td>
-				<td><a href="#" class="apiLookup" data-cmd="chat:send">Send chat.</a></td>
-			</tr>
-			<tr>
-				<th>chat:logs</th>
-				<td>Gets all the chat logs since bot start.<br />
-					<select id="chatLogs_EventName">
-						<option value="">All logs</option>
-						<option value="CHAT_MSG_WHISPER">Whispers</option>
-						<option value="CHAT_MSG_SAY">Say</option>
-					</select>
-				</td>
-				<td><a href="#" class="apiLookup" data-cmd="chat:logs">Get chat logs</a></td>
-			</tr>
-		</table>
-	
-		
-		<div id="panelRequest" style="display: none;">
-		
-		
-			<p>Request sent: <span id="requestSent"></span></p>
+		<div id="wrapper">
+			<div id="header">
+				<h1>PeecsWebservice <span>- Test API</span></h1>
+				<p>Simple single page web app that lets you test the REST API.</p>
+			</div>
+			<div id="content">
+				<p>This client is for testing against Peecs Webservice for Honorbuddy. Set the correct Server INFO based on your settings for Peecs Webservice.</p>
 			
-			<h3 id="reqStatus"></h3>
+				<h2>Server INFO:</h2>
+					<strong>Connection</strong> <input type="text" id="serverInformation" value="http://localhost:9097" /><br />
+					<strong>Version API</strong> <input type="text" id="apiVersion" value="0.0.2" /><br />
+					<strong>API Key</strong> <input type="text" id="apiKey" value="yours33cretk333yyy" /><br />
+				<h2>Apis:</h2>
+				<table border="1">
+					<tr>
+						<th>Type</th><th>Description</th><th>Test API</th>
+					</tr>
+					<tr>
+						<th>me:playerInfo</th>
+						<td>Returns player information such as location, gold etc. </td>
+						<td><a href="#" class="apiLookup" data-cmd="me:playerInfo">Get playerInfo</a></td>
+					</tr>
+					<tr>
+						<th>me:gameStats</th>
+						<td>Returns all game stats such as bgs won, lost, deaths etc. </td>
+						<td><a href="#" class="apiLookup" data-cmd="me:gameStats">Get gameStats</a></td>
+					</tr>
+					<tr>
+						<th>me:items</th>
+						<td>Gets equipped and inventory item ids including durability / amount. </td>
+						<td><a href="#" class="apiLookup" data-cmd="me:items">Get items</a></td>
+					</tr>
+					<tr>
+						<th>bot:start</th>
+						<td>Starts the bot</td>
+						<td><a href="#" class="apiLookup" data-cmd="bot:start">Start bot</a></td>
+					</tr>
+					<tr>
+						<th>bot:stop</th>
+						<td>Stops the bot</td>
+						<td><a href="#" class="apiLookup" data-cmd="bot:stop">Stop bot</a></td>
+					</tr>
+					<tr>
+						<th>bot:isRunning</th>
+						<td>Checks if the bot is started.</td>
+						<td><a href="#" class="apiLookup" data-cmd="bot:isRunning">Check if running bot</a></td>
+					</tr>
+					<tr>
+						<th>game:getScreenshots</th>
+						<td>Gets all the screenshots URLS + names.</td>
+						<td><a href="#" class="apiLookup" data-cmd="game:getScreenshots">Get all screenshots</a></td>
+					</tr>
+					<tr>
+						<th>game:takeScreenshot</th>
+						<td>Takes a screenshot, delivers url + name of sreenshot back. Note it gives back partial URL, not server host. So see screenshot at <span class="serverHost"></span>/URL</td>
+						<td><a href="#" class="apiLookup" data-cmd="game:takeScreenshot">Take a screenshot</a></td>
+					</tr>
+					<tr>
+						<th>chat:send</th>
+						<td>Sends a message in-game.<br />
+							<p>Message: <textarea id="chat_msg">yup..</textarea></p>
+							<p>chatType: <input type="text" id="chat_chatType" value="SAY" /></p>
+							<p>Language: <input type="text" id="chat_language" value="" /></p>
+							<p>Channel: <input type="text" id="chat_channel" value="" /></p>
+						</td>
+						<td><a href="#" class="apiLookup" data-cmd="chat:send">Send chat.</a></td>
+					</tr>
+					<tr>
+						<th>chat:logs</th>
+						<td>Gets all the chat logs since bot start.<br />
+							<select id="chatLogs_EventName">
+								<option value="">All logs</option>
+								<option value="CHAT_MSG_WHISPER">Whispers</option>
+								<option value="CHAT_MSG_SAY">Say</option>
+							</select>
+						</td>
+						<td><a href="#" class="apiLookup" data-cmd="chat:logs">Get chat logs</a></td>
+					</tr>
+				</table>
 			
-			<div>
-				<div class="col">
-					<h2>JSON Result:</h2>
-					<textarea style="width: 100%; height: 400px;" value="" id="result"></textarea>
-				</div>
-				<div class="col">
-					<h2>Data got back:</h2>
-					<div id="datamapped"></div>
+				
+				<div id="panelRequest" style="display: none;">
+				
+				
+					<p>Request sent: <span id="requestSent"></span></p>
+					
+					<h3 id="reqStatus"></h3>
+					
+					<div class="row">
+						<div class="col">
+							<h2>JSON Result:</h2>
+							<textarea style="width: 100%; height: 400px;" value="" id="result"></textarea>
+						</div>
+						<div class="col">
+							<h2>Data got back:</h2>
+							<div id="datamapped"></div>
+						</div>
+					</div>
 				</div>
 			</div>
 		</div>

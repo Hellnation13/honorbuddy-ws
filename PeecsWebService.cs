@@ -68,16 +68,14 @@ namespace com.peec.webservice
             Chat.RaidLeader += QueueChat;
 
 
-            Styx.CommonBot.BotEvents.OnBotStopped -= OnStop;
-            Styx.CommonBot.BotEvents.OnBotStarted -= OnStart;
+            Styx.CommonBot.BotEvents.OnBotStopped += OnStop;
+            Styx.CommonBot.BotEvents.OnBotStarted += OnStart;
 
             Logging.Write("Init : WebService");
+
             startServer();
 
-
-
             WoWPath = Path.GetDirectoryName(Styx.StyxWoW.Memory.Process.MainModule.FileName);
-
 
 
         }
@@ -95,6 +93,9 @@ namespace com.peec.webservice
             Chat.BattlegroundLeader -= QueueChat;
             Chat.Raid -= QueueChat;
             Chat.RaidLeader -= QueueChat;
+
+            Styx.CommonBot.BotEvents.OnBotStopped -= OnStop;
+            Styx.CommonBot.BotEvents.OnBotStarted -= OnStart;
 
             chatLogs.Clear();
 
@@ -136,8 +137,6 @@ namespace com.peec.webservice
                         Logging.Write("HttpListener not supported.");
                         return;
                     }
-
-
                     web = new HttpServer(20);
                     
                     web.ProcessRequest -= OnRequest;
@@ -198,11 +197,7 @@ namespace com.peec.webservice
                 data["result"] = new Hashtable();
                 Logging.Write(string.Format("Error {0} stack: {1}", e.Message, e.StackTrace));
                 result = JSON.JsonEncode(data);
-                buffer = Encoding.UTF8.GetBytes(result);
-                response.ContentLength64 = buffer.Length;
-                response.OutputStream.Write(buffer, 0, buffer.Length);
-                response.OutputStream.Close();
-                response.Close();
+                HttpServer.SendResponse(response, result);
                 return;
             }
 
@@ -217,11 +212,7 @@ namespace com.peec.webservice
                     
                 response.ContentType = "image/jpeg";
                 buffer = System.IO.File.ReadAllBytes(img);
-                response.ContentLength64 = buffer.Length;
-                response.OutputStream.Write(buffer, 0, buffer.Length);
-                response.OutputStream.Close();
-                response.Close();
-                
+                HttpServer.SendResponse(response, buffer);
                 return;
             }
 
@@ -270,13 +261,7 @@ namespace com.peec.webservice
                 response.StatusCode = 200; // jsonp must have 200 code :(
             }
 
-
-            buffer = Encoding.UTF8.GetBytes(result);
-            response.ContentLength64 = buffer.Length;
-            response.OutputStream.Write(buffer, 0, buffer.Length);
-            response.OutputStream.Close();
-            response.Close();
-
+            HttpServer.SendResponse(response, result);
         }
 
         
@@ -293,70 +278,7 @@ namespace com.peec.webservice
             }
         }
 
-        public Hashtable getStats()
-        {
-            Hashtable data = new Hashtable();
-                using (Styx.StyxWoW.Memory.AcquireFrame())
-                {
-
-                    Hashtable me = new Hashtable();
-                    me["Level"] = Me.Level;
-                    me["Experience"] = Me.Experience;
-                    me["Copper"] = Me.Copper;
-                    me["NextLevelExperience"] = Me.NextLevelExperience;
-                    me["Durability"] = Me.Durability;
-                    me["DurabilityPercent"] = Me.DurabilityPercent;
-                    me["FreeBagSlots"] = Me.FreeBagSlots;
-
-                    Hashtable items = new Hashtable();
-                    List<WoWItem> its = Me.BagItems;
-                    for (int i = 0; i < its.Count; i++ )
-                    {
-                        items[its[i].Entry] = its[i].StackCount;
-                    }
-                    me["BagItems"] = items;
-
-                    Hashtable items2 = new Hashtable();
-                    WoWItem[] equipped = Me.Inventory.Equipped.Items;
-                    for (int i = 0; i < equipped.Length; i++)
-                    {
-                        if (equipped[i] != null) items2[equipped[i].Entry] = equipped[i].DurabilityPercent;
-                    }
-                    me["EquippedItems"] = items2;
-
-
-                    
-
-                    Hashtable loc = new Hashtable();
-                    loc["X"] = Me.X;
-                    loc["Y"] = Me.Y;
-                    loc["Z"] = Me.Z;
-                    loc["ZoneText"] = Me.ZoneText;
-
-                    me["WorldLocation"] = loc;
-
-                    data["Me"] = me;
-
-                    Hashtable stats = new Hashtable();
-                    stats["XPPerHour"] = Styx.CommonBot.GameStats.XPPerHour;
-                    stats["TimeToLevel"] = Styx.CommonBot.GameStats.TimeToLevel.TotalSeconds;
-                    stats["MobsKilled"] = Styx.CommonBot.GameStats.MobsKilled;
-                    stats["MobsPerHour"] = Styx.CommonBot.GameStats.MobsPerHour;
-                    stats["HonorGained"] = Styx.CommonBot.GameStats.HonorGained;
-                    stats["HonorPerHour"] = Styx.CommonBot.GameStats.HonorPerHour;
-                    stats["BGsWon"] = Styx.CommonBot.GameStats.BGsWon;
-                    stats["BGsLost"] = Styx.CommonBot.GameStats.BGsLost;
-                    data["GameStats"] = stats;
-
-                    Hashtable gb = new Hashtable();
-                    gb["NodeCollectionCount"] = Bots.Gatherbuddy.GatherbuddyBot.NodeCollectionCount;
-                    data["Gatherbuddy"] = gb;
-
-
-                }
-
-            return data;
-		}
+        
 
 
         public void checkRequestAccess(NameValueCollection res)
@@ -383,13 +305,22 @@ namespace com.peec.webservice
             reqData["secretKey"] = this.apiKey;
             reqData["apiVersion"] = this.Version.ToString();
 
+
+            JSONAPI reqHandler = new JSONAPI(this.apiKey, this.Version);
+
             Hashtable result = new Hashtable();
             switch ((string)res["cmd"])
             {
                 default:
                     throw new Exception(string.Format("{0} is not a valid cmd.", res["cmd"]));
-                case "me:stats":
-                    result = getStats();
+                case "me:playerInfo":
+                    result = reqHandler.Me.getPlayerInfo(Me);
+                    break;
+                case "me:gameStats":
+                    result = reqHandler.Me.getGameStats(Me);
+                    break;
+                case "me:items":
+                    result = reqHandler.Me.getItems(Me);
                     break;
                 case "chat:send":
                     LuaAPI.SendChatMessage(
@@ -400,84 +331,22 @@ namespace com.peec.webservice
                         );
                     break;
                 case "game:getScreenshots":
-                    FileInfo[] files = getScreenshotDir().GetFiles();
-                    Array.Sort(files, delegate(FileInfo f1, FileInfo f2)
-                    {
-                        return f2.LastWriteTime.CompareTo(f1.LastWriteTime);
-                    });
-
-                    for (int i = 0; i < files.Length; i++ )
-                    {
-                        if (i == 50) continue; // Max 50.
-                        
-                        FileInfo f = files[i];
-                        
-                        Hashtable t = new Hashtable();
-                        t["screenshot"] = f.Name;
-                        t["url"] = "?img=" + f.Name + "&secretKey=" + apiKey + "&apiVersion=" + Version.ToString();
-                        result[i] = t;
-
-                    }
+                    result = reqHandler.Game.getScreenshots(getScreenshotDir());
                     break;
                 case "game:takeScreenshot":
-                    LuaAPI.TakeScreenshot();
-
-                    FileInfo file = Utils.GetLatestFileInDir(getScreenshotDir());
-                    result["screenshot"] = file.Name;
-                    result["url"] = "?img=" + file.Name + "&secretKey=" + apiKey + "&apiVersion=" + Version.ToString();
-
-
+                    result = reqHandler.Game.takeScreenshot(getScreenshotDir());
                     break;
                 case "bot:start":
-                    if (Styx.CommonBot.TreeRoot.IsRunning)
-                    {
-                        throw new Exception("Bot is currently running.");
-                    }
-                    else
-                    {
-                        Styx.CommonBot.TreeRoot.Start();
-                        result["success"] = "Bot started.";
-                    }
+                    result = reqHandler.Bot.start();
                     break;
                 case "chat:logs":
-                    List<ChatLog> list;
-                    if (res["EventName"] == null || res["EventName"] == "")
-                    {
-                        list = chatLogs;
-                    }
-                    else
-                    {
-                        list = chatLogs.FindAll(delegate(ChatLog cl) { return cl.EventName == res["EventName"]; });
-                    }
-
-                    list.Sort((x, y) => x.FireTimeStamp.CompareTo(y.FireTimeStamp));
-
-                    for(int i=0; i < list.Count; i++){
-                        if (i > 200) continue;
-                        ChatLog l = list[i];
-                        Hashtable listing = new Hashtable();
-                        listing["EventName"] = l.EventName;
-                        listing["Author"] = l.Author;
-                        listing["FireTimeStamp"] = l.FireTimeStamp;
-                        listing["Message"] = l.Message;
-                        result[i] = listing;
-                    }
-
-                    
+                    result = reqHandler.Chat.logs(chatLogs, res["EventName"]);
                     break;
                 case "bot:isRunning":
-                    result["isRunning"] = Styx.CommonBot.TreeRoot.IsRunning;
+                    result = reqHandler.Bot.isRunning();
                     break;
                 case "bot:stop":
-                    if (!Styx.CommonBot.TreeRoot.IsRunning)
-                    {
-                        throw new Exception("Bot is not running.");
-                    }
-                    else
-                    {
-                        Styx.CommonBot.TreeRoot.Stop();
-                        result["success"] = "Bot stopped.";
-                    }
+                    result = reqHandler.Bot.stop();
                     break;
                 
 
@@ -497,7 +366,7 @@ namespace com.peec.webservice
             chatLogs.Add(new ChatLog(e.EventName, e.Author, e.Message, e.FireTimeStamp));
         }
 
-        private class ChatLog
+        public class ChatLog
         {
             public string EventName, Author, Message;
             public uint FireTimeStamp;
