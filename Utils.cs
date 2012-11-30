@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Collections.Specialized;
 using System.Text.RegularExpressions;
+using System.IO;
 
 namespace com.peec.webservice
 {
@@ -24,6 +25,26 @@ namespace com.peec.webservice
             if (lowerCase)
                 return builder.ToString().ToLower();
             return builder.ToString();
+        }
+
+        public static FileInfo GetLatestFileInDir(DirectoryInfo directoryInfo)
+        {
+            if (directoryInfo == null || !directoryInfo.Exists)
+                return null;
+
+            FileInfo[] files = directoryInfo.GetFiles();
+            DateTime lastWrite = DateTime.MinValue;
+            FileInfo lastWritenFile = null;
+
+            foreach (FileInfo file in files)
+            {
+                if (file.LastWriteTime > lastWrite)
+                {
+                    lastWrite = file.LastWriteTime;
+                    lastWritenFile = file;
+                }
+            }
+            return lastWritenFile;
         }
 
     }

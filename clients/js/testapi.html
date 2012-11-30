@@ -38,13 +38,43 @@
 				this.bot = bot;
 				
 				
-				this.run = function(cmd, sHandler, eHandler){
+				/* Game API */
+				var game = function(){};
+				game.getScreenshots = function(sHandler, eHandler){
+					that.run("game:getScreenshots", sHandler, eHandler);
+				};
+				game.takeScreenshot = function(sHandler, eHandler){
+					that.run("game:takeScreenshot", sHandler, eHandler);
+				};
+				this.game = game;
+				
+				/* Chat API */
+				var chat = function(){};
+				chat.send = function(msg, chatType, language, channel, sHandler, eHandler){
+					that.run("chat:send", sHandler, eHandler, {
+						msg: msg,
+						chatType: chatType,
+						language: language,
+						channel: channel
+					});
+				};
+				chat.logs = function(EventName, sHandler, eHandler){
+					that.run("chat:logs", sHandler, eHandler, {
+						EventName: EventName
+					});
+				};
+				this.chat = chat;
+				
+				this.run = function(cmd, sHandler, eHandler, extras){
 					
 					var params = {
 							"cmd": cmd,
 							"secretKey": this.secretKey,
 							"apiVersion": this.apiVersion
 						};
+					if (typeof extras !== 'undefined'){
+						for (var attrname in extras) { params[attrname] = extras[attrname]; }
+					}
 					
 					this.onBeforeRun(params);
 					
@@ -114,20 +144,18 @@
 			
 			
 			
+			
 			/**
 			 * Test application.
 			 */
 			$(function(){
 				$("#result").val(""); // Force set value to nothing at reload.
-				
+				$("#chat_msg").val("yup ..");
 				// Used for errors and success.
 				var successCallback = function(data){
 						$("#result").val(JSON.stringify(data));
-						var html = $("<ul></ul>");
-						$.each(data.result, function(k, v){
-							html.append("<li><strong>"+k+": </strong> "+v+"</li>");
-						});
-						$("#datamapped").html(html);
+						
+						$("#datamapped").html(renderContents(data));
 						
 						$('#reqStatus').text("REQUEST OK");
 						$('#reqStatus').attr('style', 'color: green;');
@@ -183,9 +211,56 @@
 					case "bot:isRunning":
 						api.bot.isRunning();
 					break;
+					case "game:getScreenshots":
+						api.game.getScreenshots();
+					break;
+					case "game:takeScreenshot":
+						api.game.takeScreenshot();
+					break;
+					case "chat:send":
+						api.chat.send($('#chat_msg').val(), $('#chat_chatType').val(),$('#chat_language').val(),$('#chat_channel').val());
+					break;
+					case "chat:logs":
+						api.chat.logs($('#chatLogs_EventName').val());
+					break;
+					
 					}
 				});
 			});
+			
+			
+			
+			/* App helpers.. */
+			
+			/* Just to print list recursive of json..*/
+			function renderContents(contents) {
+				var index, ul;
+
+				// Create a list for these contents
+				ul = $("<ul>");
+
+				// Fill it in
+				$.each(contents, function(index, entry) {
+				  var li;
+
+				  // Create list item
+				  li = $("<li>");
+
+				  // Set the text
+				  li.html("<strong>" + index + "</strong>: " + (typeof entry !== 'object' ? entry : ""));
+
+				  // Append a sublist of its contents if it has them
+				  if (typeof entry === 'object') {
+					li.append(renderContents(entry));
+				  }
+
+				  // Add this item to our list
+				  ul.append(li);
+				});
+
+				// Return it
+				return ul;
+			  }
 			
 		
 		</script>
@@ -229,6 +304,37 @@
 				<th>bot:isRunning</th>
 				<td>Checks if the bot is started.</td>
 				<td><a href="#" class="apiLookup" data-cmd="bot:isRunning">Check if running bot</a></td>
+			</tr>
+			<tr>
+				<th>game:getScreenshots</th>
+				<td>Gets all the screenshots URLS + names.</td>
+				<td><a href="#" class="apiLookup" data-cmd="game:getScreenshots">Get all screenshots</a></td>
+			</tr>
+			<tr>
+				<th>game:takeScreenshot</th>
+				<td>Takes a screenshot, delivers url + name of sreenshot back.</td>
+				<td><a href="#" class="apiLookup" data-cmd="game:takeScreenshot">Take a screenshot</a></td>
+			</tr>
+			<tr>
+				<th>chat:send</th>
+				<td>Sends a message in-game.<br />
+					<p>Message: <textarea id="chat_msg">yup..</textarea></p>
+					<p>chatType: <input type="text" id="chat_chatType" value="SAY" /></p>
+					<p>Language: <input type="text" id="chat_language" value="" /></p>
+					<p>Channel: <input type="text" id="chat_channel" value="" /></p>
+				</td>
+				<td><a href="#" class="apiLookup" data-cmd="chat:send">Send chat.</a></td>
+			</tr>
+			<tr>
+				<th>chat:logs</th>
+				<td>Gets all the chat logs since bot start.<br />
+					<select id="chatLogs_EventName">
+						<option value="">All logs</option>
+						<option value="CHAT_MSG_WHISPER">Whispers</option>
+						<option value="CHAT_MSG_SAY">Say</option>
+					</select>
+				</td>
+				<td><a href="#" class="apiLookup" data-cmd="chat:logs">Get chat logs</a></td>
 			</tr>
 		</table>
 	

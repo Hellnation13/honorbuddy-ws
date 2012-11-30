@@ -18,6 +18,7 @@ using Styx.Common.Helpers;
 using System.Collections.Specialized;
 using System.Text;
 using System.Net.NetworkInformation;
+using System.Runtime.Serialization;
 
 namespace com.peec.webservice
 {
@@ -37,6 +38,7 @@ namespace com.peec.webservice
 
         
         static HttpServer web;
+        private List<ChatLog> chatLogs;
 
         // Configuration 
         private string apiKey;
@@ -48,11 +50,49 @@ namespace com.peec.webservice
 
         public override void Initialize()
         {
+            chatLogs = new List<ChatLog>();
+
+            Chat.Say += QueueChat;
+            Chat.Yell += QueueChat;
+            Chat.Whisper += QueueChat;
+            Chat.Party += QueueChat;
+            Chat.PartyLeader += QueueChat;
+            Chat.Battleground += QueueChat;
+            Chat.BattlegroundLeader += QueueChat;
+            Chat.Raid += QueueChat;
+            Chat.RaidLeader += QueueChat;
 
             Logging.Write("Init : WebService");
             startServer();
 
+            
+
         }
+        public override void Dispose()
+        {
+            base.Dispose();
+
+            stopServer();
+            Chat.Say -= QueueChat;
+            Chat.Yell -= QueueChat;
+            Chat.Whisper -= QueueChat;
+            Chat.Party -= QueueChat;
+            Chat.PartyLeader -= QueueChat;
+            Chat.Battleground -= QueueChat;
+            Chat.BattlegroundLeader -= QueueChat;
+            Chat.Raid -= QueueChat;
+            Chat.RaidLeader -= QueueChat;
+
+            chatLogs.Clear();
+
+            
+
+        }
+
+        private DirectoryInfo getScreenshotDir(){
+            return new DirectoryInfo(WSSettings.Instance.WoWPath + "\\Screenshots\\");
+        }
+
 
         public void startServer()
         {
@@ -109,18 +149,59 @@ namespace com.peec.webservice
         }
 
 
-        public override void Dispose()
-        {
-            stopServer();
-            base.Dispose();
-            
-        }
+        
 
 
         public void OnRequest(HttpListenerContext ctx)
         {
             string result = "{}";
+            byte[] buffer;
             HttpListenerResponse response = ctx.Response;
+
+            // Check access..
+            try
+            {
+                checkRequestAccess(ctx.Request.QueryString);
+            }
+            catch (Exception e)
+            {
+                response.ContentType = "application/json";
+                response.StatusCode = 400;
+                Hashtable data = new Hashtable();
+                data["ok"] = false;
+                data["error"] = e.Message;
+                data["result"] = new Hashtable();
+                Logging.Write(string.Format("Error {0} stack: {1}", e.Message, e.StackTrace));
+                result = JSON.JsonEncode(data);
+                buffer = Encoding.UTF8.GetBytes(result);
+                response.ContentLength64 = buffer.Length;
+                response.OutputStream.Write(buffer, 0, buffer.Length);
+                response.OutputStream.Close();
+                response.Close();
+                return;
+            }
+
+
+
+            // Image
+            string img = ctx.Request.QueryString.Get("img");
+            if (img != null)
+            {
+                response.StatusCode = 200;
+                img = WSSettings.Instance.WoWPath + "\\Screenshots\\" + img;
+                    
+                response.ContentType = "image/jpeg";
+                buffer = System.IO.File.ReadAllBytes(img);
+                response.ContentLength64 = buffer.Length;
+                response.OutputStream.Write(buffer, 0, buffer.Length);
+                response.OutputStream.Close();
+                response.Close();
+                
+                return;
+            }
+
+            // Json
+
             response.ContentType = "application/json";
             response.ContentEncoding = Encoding.UTF8;
 
@@ -166,7 +247,7 @@ namespace com.peec.webservice
             }
 
 
-            byte[] buffer = Encoding.UTF8.GetBytes(result);
+            buffer = Encoding.UTF8.GetBytes(result);
             response.ContentLength64 = buffer.Length;
             response.OutputStream.Write(buffer, 0, buffer.Length);
             response.OutputStream.Close();
@@ -174,10 +255,18 @@ namespace com.peec.webservice
 
         }
 
+        
+
 
         
 		public override void Pulse(){
-            
+
+            if (chatLogs.Count >= 5000)
+            {
+                chatLogs.RemoveAll(delegate(ChatLog l) {
+                    return !l.IsWhisper();
+                });
+            }
         }
 
         public Hashtable getStats()
@@ -185,30 +274,31 @@ namespace com.peec.webservice
             Hashtable data = new Hashtable();
                 using (Styx.StyxWoW.Memory.AcquireFrame())
                 {
-
-                    data["level"] = Convert.ToInt32(Styx.StyxWoW.Me.Level).ToString();
-                    data["xp"] = Convert.ToUInt32(Styx.StyxWoW.Me.Experience).ToString();
-                    data["xp_needed"] = Convert.ToUInt32(Styx.StyxWoW.Me.NextLevelExperience).ToString();
-                    data["xph"] = Convert.ToUInt32(Styx.CommonBot.GameStats.XPPerHour).ToString();
-                    data["timetolevel"] = Convert.ToUInt32(Styx.CommonBot.GameStats.TimeToLevel.TotalSeconds).ToString();
-                    data["kills"] = Convert.ToUInt32(Styx.CommonBot.GameStats.MobsKilled).ToString();
-                    data["killsh"] = Convert.ToUInt32(Styx.CommonBot.GameStats.MobsPerHour).ToString();
-                    data["honor"] = Convert.ToUInt32(Styx.CommonBot.GameStats.HonorGained).ToString();
-                    data["honorh"] = Convert.ToUInt32(Styx.CommonBot.GameStats.HonorPerHour).ToString();
-                    data["bgwin"] = Convert.ToUInt32(Styx.CommonBot.GameStats.BGsWon).ToString();
-                    data["bglost"] = Convert.ToUInt32(Styx.CommonBot.GameStats.BGsLost).ToString();
-                    data["gold"] = Convert.ToUInt32(Styx.StyxWoW.Me.Copper).ToString();
-                    data["nodeh"] = JSON.JsonEncode(Bots.Gatherbuddy.GatherbuddyBot.NodeCollectionCount);
+                    
+                    data["Level"] = Styx.StyxWoW.Me.Level;
+                    data["Experience"] = Styx.StyxWoW.Me.Experience;
+                    data["NextLevelExperience"] = Styx.StyxWoW.Me.NextLevelExperience;
+                    data["XPPerHour"] = Styx.CommonBot.GameStats.XPPerHour;
+                    data["TimeToLevel"] = Styx.CommonBot.GameStats.TimeToLevel.TotalSeconds;
+                    data["MobsKilled"] = Styx.CommonBot.GameStats.MobsKilled;
+                    data["MobsPerHour"] = Styx.CommonBot.GameStats.MobsPerHour;
+                    data["HonorGained"] = Styx.CommonBot.GameStats.HonorGained;
+                    data["HonorPerHour"] = Styx.CommonBot.GameStats.HonorPerHour;
+                    data["BGsWon"] = Styx.CommonBot.GameStats.BGsWon;
+                    data["BGsLost"] = Styx.CommonBot.GameStats.BGsLost;
+                    data["Copper"] = Styx.StyxWoW.Me.Copper;
+                    data["NodeCollectionCount"] = Bots.Gatherbuddy.GatherbuddyBot.NodeCollectionCount;
 
                 }
 
             return data;
 		}
 
-        public Hashtable parseResult(NameValueCollection res)
-        {
 
-            if ((string)res["secretKey"] == "" || (string)res["secretKey"] != this.apiKey){
+        public void checkRequestAccess(NameValueCollection res)
+        {
+            if ((string)res["secretKey"] == "" || (string)res["secretKey"] != this.apiKey)
+            {
                 Logging.Write("Response is invalid. Must be of type JSON and include \"secretKey\" with the corresponding secret key.");
                 throw new Exception("Could not authenticate this key.");
             }
@@ -217,9 +307,12 @@ namespace com.peec.webservice
                 Logging.Write("Response is invalid. Must be of type JSON and include correct \"apiVersion\". Current API VERSION is " + Version.ToString());
                 throw new Exception(string.Format("Wrong API version of client ({0}), current server API version is: {1}.", res["apiVersion"], Version.ToString()));
             }
+        }
 
+        public Hashtable parseResult(NameValueCollection res)
+        {
 
-
+            
 
             Hashtable reqData = new Hashtable();
             
@@ -234,6 +327,43 @@ namespace com.peec.webservice
                 case "me:stats":
                     result = getStats();
                     break;
+                case "chat:send":
+                    LuaAPI.SendChatMessage(
+                        LuaAPI.cs(res["msg"]), 
+                        LuaAPI.cs(res["chatType"]),
+                        LuaAPI.cs(res["language"]), 
+                        LuaAPI.cs(res["channel"])
+                        );
+                    break;
+                case "game:getScreenshots":
+                    FileInfo[] files = getScreenshotDir().GetFiles();
+                    Array.Sort(files, delegate(FileInfo f1, FileInfo f2)
+                    {
+                        return f2.LastWriteTime.CompareTo(f1.LastWriteTime);
+                    });
+
+                    for (int i = 0; i < files.Length; i++ )
+                    {
+                        if (i == 50) continue; // Max 50.
+                        
+                        FileInfo f = files[i];
+                        
+                        Hashtable t = new Hashtable();
+                        t["screenshot"] = f.Name;
+                        t["url"] = "?img=" + f.Name + "&secretKey=" + apiKey + "&apiVersion=" + Version.ToString();
+                        result[i] = t;
+
+                    }
+                    break;
+                case "game:takeScreenshot":
+                    LuaAPI.TakeScreenshot();
+
+                    FileInfo file = Utils.GetLatestFileInDir(getScreenshotDir());
+                    result["screenshot"] = file.Name;
+                    result["url"] = "?img=" + file.Name + "&secretKey=" + apiKey + "&apiVersion=" + Version.ToString();
+
+
+                    break;
                 case "bot:start":
                     if (Styx.CommonBot.TreeRoot.IsRunning)
                     {
@@ -244,6 +374,29 @@ namespace com.peec.webservice
                         Styx.CommonBot.TreeRoot.Start();
                         result["success"] = "Bot started.";
                     }
+                    break;
+                case "chat:logs":
+                    List<ChatLog> list;
+                    if (res["EventName"] == null || res["EventName"] == "")
+                    {
+                        list = chatLogs;
+                    }
+                    else
+                    {
+                        list = chatLogs.FindAll(delegate(ChatLog cl) { return cl.EventName  == res["type"]; });
+                    }
+                    
+                    for(int i=0; i < list.Count; i++){
+                        ChatLog l = list[i];
+                        Hashtable listing = new Hashtable();
+                        listing["EventName"] = l.EventName;
+                        listing["Author"] = l.Author;
+                        listing["FireTimeStamp"] = l.FireTimeStamp;
+                        listing["Message"] = l.Message;
+                        result[i] = listing;
+                    }
+
+                    
                     break;
                 case "bot:isRunning":
                     result["isRunning"] = Styx.CommonBot.TreeRoot.IsRunning;
@@ -259,6 +412,7 @@ namespace com.peec.webservice
                         result["success"] = "Bot stopped.";
                     }
                     break;
+                
 
 
             }
@@ -267,7 +421,32 @@ namespace com.peec.webservice
 
             return reqData;
         }
-		
+
+        
+
+
+        private void QueueChat(Styx.CommonBot.Chat.ChatLanguageSpecificEventArgs e)
+        {
+            Logging.Write("Queue chat..." + e.EventName);
+            chatLogs.Add(new ChatLog(e.EventName, e.Author, e.Message, e.FireTimeStamp));
+        }
+
+        private class ChatLog
+        {
+            public string EventName, Author, Message;
+            public uint FireTimeStamp;
+            public ChatLog(string EventName, string Author, string Message, uint FireTimeStamp)
+            {
+                this.EventName = EventName;
+                this.Author = Author;
+                this.Message = Message;
+                this.FireTimeStamp = FireTimeStamp;
+            }
+            public bool IsWhisper()
+            {
+                return EventName == "CHAT_MSG_WHISPER";
+            }
+        }
 		
 	}
 	
