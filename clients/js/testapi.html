@@ -8,71 +8,180 @@
 		
 		<script type="text/javascript">
 		
+			/**
+			 * Generic API to use with Peecs Webservice.
+			 * @author Peec
+			 */
 			var HonorbuddyAPI = function(apiLocation, secretKey, apiVersion, successCallback, errorCallback){
-				this.apiLocation = apiLocation;
-				this.secretKey = secretKey;
-				this.apiVersion = apiVersion;
-				this.successCallback = successCallback;
-				this.errorCallback = errorCallback;
+				
+				var that = this;
 				
 				
-				this.getStats = function(){
-					this.run("stats");
+				/* Me API */
+				var me = function(){};
+				me.getStats = function(sHandler, eHandler){
+					that.run("me:stats", sHandler, eHandler);
+				}
+				this.me = me;
+				
+				/* Bot API*/
+				var bot = function(){};
+				bot.stop = function(sHandler, eHandler){
+					that.run("bot:stop", sHandler, eHandler);
 				};
+				bot.start = function(sHandler, eHandler){
+					that.run("bot:start", sHandler, eHandler);
+				};
+				bot.isRunning = function(sHandler, eHandler){
+					that.run("bot:isRunning", sHandler, eHandler);
+				};
+				this.bot = bot;
 				
-				this.run = function(cmd){
-					var that = this;
+				
+				this.run = function(cmd, sHandler, eHandler){
 					
 					var params = {
 							"cmd": cmd,
-							"secretKey": that.secretKey,
-							"apiVersion": that.apiVersion
+							"secretKey": this.secretKey,
+							"apiVersion": this.apiVersion
 						};
+					
+					this.onBeforeRun(params);
+					
+					var req = $.ajax({
+						url: this.apiLocation,
+						data: params,
+						dataType: this.useJsonp ? "jsonp" : "json"
+					});
+					
+					var s = sHandler || this.successCallback;
+					var e = eHandler || this.errorCallback;
+					if (!this.useJsonp){
+						req.success(s);
+						req.error(function(xhr){
+							e(JSON.parse(xhr.responseText));
+						});
+					}else{
+						var that = this;
+						req.success(function(data){
+							if (data.error){
+								e(data);
+							}else{
+								s(data);
+							}
+						});
+					}
+					
+				}
+				
+				this.setApiLocation = function(loc){
+					this.apiLocation = loc + "?callback=?";
+				};
+				
+				/**
+				 * API Location (example http://localhost:9097)
+				 */
+				this.setApiLocation(apiLocation);
+				/**
+				 * Server API Key
+				 */
+				this.secretKey = secretKey;
+				/**
+				 * Server api version.
+				 */
+				this.apiVersion = apiVersion;
+				/**
+				 * Global error callback.
+				 */
+				this.successCallback = successCallback;
+				/**
+				 * Global success callback.
+				 */
+				this.errorCallback = errorCallback;
+				
+				/**
+				 * Whenever to use JSONP or not.
+				 */
+				this.useJsonp = true;
+				
+				/**
+				 * Run before ajax request is done
+				 * @param array params Array of parameters sent to the ajax request.
+				 */
+				this.onBeforeRun = function(params){}
+				
+			};
+			
+			
+			
+			/**
+			 * Test application.
+			 */
+			$(function(){
+				$("#result").val(""); // Force set value to nothing at reload.
+				
+				// Used for errors and success.
+				var successCallback = function(data){
+						$("#result").val(JSON.stringify(data));
+						var html = $("<ul></ul>");
+						$.each(data.result, function(k, v){
+							html.append("<li><strong>"+k+": </strong> "+v+"</li>");
+						});
+						$("#datamapped").html(html);
+						
+						$('#reqStatus').text("REQUEST OK");
+						$('#reqStatus').attr('style', 'color: green;');
+						
+						$('#panelRequest').show();
+						
+					};
+			
+				var api = new HonorbuddyAPI($("#serverInformation").val(), $("#apiKey").val(), $("#apiVersion").val(), 
+					successCallback, 
+					// Global Error callback..
+					function(data){
+						successCallback(data);
+						
+						$('#reqStatus').text("REQUEST FAILED");
+						$('#reqStatus').attr('style', 'color: red;');
+					}
+				);
+				
+				api.onBeforeRun = function(params){
 					var strParams = "";
 					$.each(params, function(k, v){
 						strParams +=  "&" + k + "=" + v;
 					});
 					
-					$('#requestSent').text(that.apiLocation + strParams);
-					
-					$.ajax({  
-						
-						url: that.apiLocation,
-						data: params,
-						dataType: 'jsonp',
-						success: that.successCallback,
-						error: that.errorCallback
-					});
-					
-					
-				}
+					$('#requestSent').text(this.apiLocation + strParams);
+				};
 				
-			};
-			
-			
-			var api = new HonorbuddyAPI("http://localhost:9097?callback=?", "yours33cretk333yyy", "0.0.2", 
-			// Success callback.
-			function(data){
-				$("#result").val(JSON.stringify(data));
-				var html = $("<ul></ul>");
-				$.each(data, function(k, v){
-					html.append("<li><strong>"+k+": </strong> "+v+"</li>");
+				
+				$("#serverInformation").change(function(){
+					api.setApiLocation($(this).val());
 				});
-				$("#datamapped").html(html);
+				$("#apiVersion").change(function(){
+					api.apiVersion = $(this).val();
+				});
+				$("#apiKey").change(function(){
+					api.secretKey = $(this).val();
+				});
 				
-			}, 
-			// Error callback..
-			function(jqXHR, textStatus, errorThrown){
-				console.log("error " + textStatus);
-				console.log(jqXHR.responseText);
-			});
-			
-			
-			$(function(){
 				$('.apiLookup').click(function(){
+					$("#result").val("");
+					$("#datamapped").text("");
 					switch($(this).data('cmd')){
-					case "stats":
-						api.getStats();
+					case "me:stats":
+						api.me.getStats();
+					break;
+					case "bot:stop":
+						api.bot.stop();
+					break;
+					case "bot:start":
+						api.bot.start();
+					break;
+					case "bot:isRunning":
+						api.bot.isRunning();
 					break;
 					}
 				});
@@ -90,29 +199,56 @@
 	</head>
 
 	<body>
+		<p>This client is for testing against Peecs Webservice for Honorbuddy. Set the correct Server INFO based on your settings for Peecs Webservice.</p>
+	
+		<h2>Server INFO:</h2>
+			<strong>Connection</strong> <input type="text" id="serverInformation" value="http://localhost:9097" /><br />
+			<strong>Version API</strong> <input type="text" id="apiVersion" value="0.0.2" /><br />
+			<strong>API Key</strong> <input type="text" id="apiKey" value="yours33cretk333yyy" /><br />
 		<h2>Apis:</h2>
 		<table border="1">
 			<tr>
 				<th>Type</th><th>Description</th><th>Test API</th>
 			</tr>
 			<tr>
-				<th>Stats</th>
+				<th>stats</th>
 				<td>Returns various stats</td>
-				<td><a href="#" class="apiLookup" data-cmd="stats">TEST</a></td>
+				<td><a href="#" class="apiLookup" data-cmd="me:stats">Get stats</a></td>
+			</tr>
+			<tr>
+				<th>bot:start</th>
+				<td>Starts the bot</td>
+				<td><a href="#" class="apiLookup" data-cmd="bot:start">Start bot</a></td>
+			</tr>
+			<tr>
+				<th>bot:stop</th>
+				<td>Stops the bot</td>
+				<td><a href="#" class="apiLookup" data-cmd="bot:stop">Stop bot</a></td>
+			</tr>
+			<tr>
+				<th>bot:isRunning</th>
+				<td>Checks if the bot is started.</td>
+				<td><a href="#" class="apiLookup" data-cmd="bot:isRunning">Check if running bot</a></td>
 			</tr>
 		</table>
 	
-	
-		<h3>Request sent: <span id="requestSent"></span></h3>
 		
-		<div>
-			<div class="col">
-				<h2>JSON Result:</h2>
-				<textarea style="width: 100%; height: 400px;" id="result"></textarea>
-			</div>
-			<div class="col">
-				<h2>Data got back:</h2>
-				<div id="datamapped"></div>
+		<div id="panelRequest" style="display: none;">
+		
+		
+			<p>Request sent: <span id="requestSent"></span></p>
+			
+			<h3 id="reqStatus"></h3>
+			
+			<div>
+				<div class="col">
+					<h2>JSON Result:</h2>
+					<textarea style="width: 100%; height: 400px;" value="" id="result"></textarea>
+				</div>
+				<div class="col">
+					<h2>Data got back:</h2>
+					<div id="datamapped"></div>
+				</div>
 			</div>
 		</div>
 	</body>

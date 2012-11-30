@@ -17,6 +17,7 @@ using System.Threading;
 using Styx.Common.Helpers;
 using System.Collections.Specialized;
 using System.Text;
+using System.Net.NetworkInformation;
 
 namespace com.peec.webservice
 {
@@ -35,12 +36,11 @@ namespace com.peec.webservice
         }
 
         
-        private HttpServer web;
+        static HttpServer web;
 
         // Configuration 
-        private string apiKey = "MY_SECRET_KEY";
-        private int webservicePort = 9096;
-        private string webserviceHost = "localhost";
+        private string apiKey;
+        private int webservicePort;
 		
         
 
@@ -50,16 +50,19 @@ namespace com.peec.webservice
         {
 
             Logging.Write("Init : WebService");
+            startServer();
+
+        }
+
+        public void startServer()
+        {
 
             this.apiKey = WSSettings.Instance.apikey;
             this.webservicePort = WSSettings.Instance.webport;
-            this.webserviceHost = WSSettings.Instance.weburl;
-
-
 
             if (WSSettings.Instance.enableWebserver)
             {
-
+                
 
                 try
                 {
@@ -69,31 +72,31 @@ namespace com.peec.webservice
                         return;
                     }
 
-                    web = new HttpServer(20);
-                    web.ProcessRequest += OnRequest;
 
+                    web = new HttpServer(20);
+                    
+                    web.ProcessRequest -= OnRequest;
+                    web.ProcessRequest += OnRequest;
                     web.Start(webservicePort);
-                    Logging.Write(string.Format("Listening on http://{0}:{1}/ for JSON request commands.. ", webserviceHost, webservicePort));
+                    Logging.Write(string.Format("Listening on http://*:{0}/ for JSON request commands.. ", webservicePort));
                     Logging.Write(string.Format("USING SECRET API KEY: {0}", apiKey));
 
                 }
                 catch (Exception e)
                 {
-                    
+
                     Logging.Write(string.Format("Error {0} stack: {1}", e.Message, e.StackTrace));
                 }
 
             }
-
+            else
+            {
+                stopServer();
+            }
         }
 
-
-
-
-        public override void  Dispose()
+        public void stopServer()
         {
- 	        base.Dispose();
-
             if (web != null)
             {
                 web.Stop();
@@ -103,6 +106,14 @@ namespace com.peec.webservice
                     Logging.Write("Waiting on webserver to stop.");
                 }
             }
+        }
+
+
+        public override void Dispose()
+        {
+            stopServer();
+            base.Dispose();
+            
         }
 
 
@@ -116,9 +127,13 @@ namespace com.peec.webservice
             try
             {
 
-                var res = parseResult(ctx.Request.QueryString);
+                Hashtable res = parseResult(ctx.Request.QueryString);
+                if (res != null)
+                {
+                    res["ok"] = true;
+                }
                 result = JSON.JsonEncode(res);
-
+                
                 if (res != null && result != null)
                 {
                     response.StatusCode = 200;
@@ -132,10 +147,11 @@ namespace com.peec.webservice
             catch (Exception e)
             {
                 response.StatusCode = 400;
-                
-                Dictionary<string, string> data = new Dictionary<string, string>();
-                data["ok"] = "false";
+
+                Hashtable data = new Hashtable();
+                data["ok"] = false;
                 data["error"] = e.Message;
+                data["result"] = new Hashtable();
                 Logging.Write(string.Format("Error {0} stack: {1}", e.Message, e.StackTrace));
                 result = JSON.JsonEncode(data);
             }
@@ -146,6 +162,7 @@ namespace com.peec.webservice
             {
                 result = callback+"("+result+")";
                 response.ContentType = "application/javascript";
+                response.StatusCode = 200; // jsonp must have 200 code :(
             }
 
 
@@ -160,26 +177,12 @@ namespace com.peec.webservice
 
         
 		public override void Pulse(){
-            if (WSSettings.Instance.restart)
-            {
-                WSSettings.Instance.restart = false;
-                Thread thread = new Thread(delegate() {
-                    web.Stop();
-                    while (web.isListening()) { 
-                        Thread.Sleep(1000);
-                        Logging.Write("Waiting on webserver to stop.");
-                    }
-                    Logging.Write("Starting new webserver.");
-                    Initialize();
-                    
-                });
-                thread.Start();
-                
-            }
+            
         }
-		
-		public Dictionary<string,string> getStats(){
-            Dictionary<string, string> data = new Dictionary<string, string>();
+
+        public Hashtable getStats()
+        {
+            Hashtable data = new Hashtable();
                 using (Styx.StyxWoW.Memory.AcquireFrame())
                 {
 
@@ -202,7 +205,7 @@ namespace com.peec.webservice
             return data;
 		}
 
-        public Dictionary<string, string> parseResult(NameValueCollection res)
+        public Hashtable parseResult(NameValueCollection res)
         {
 
             if ((string)res["secretKey"] == "" || (string)res["secretKey"] != this.apiKey){
@@ -218,21 +221,20 @@ namespace com.peec.webservice
 
 
 
-            Dictionary<string, string> reqData = new Dictionary<string, string>();
+            Hashtable reqData = new Hashtable();
             
             reqData["secretKey"] = this.apiKey;
             reqData["apiVersion"] = this.Version.ToString();
 
-            Dictionary<string, string> result = new Dictionary<string, string>();
+            Hashtable result = new Hashtable();
             switch ((string)res["cmd"])
             {
                 default:
-                    Logging.Write(string.Format("No support for cmd: {0}", (string)res["cmd"]));
-                    return null;
-                case "stats":
+                    throw new Exception(string.Format("{0} is not a valid cmd.", res["cmd"]));
+                case "me:stats":
                     result = getStats();
                     break;
-                case "start":
+                case "bot:start":
                     if (Styx.CommonBot.TreeRoot.IsRunning)
                     {
                         throw new Exception("Bot is currently running.");
@@ -240,10 +242,13 @@ namespace com.peec.webservice
                     else
                     {
                         Styx.CommonBot.TreeRoot.Start();
-                        result.Add("success", "Bot started.");
+                        result["success"] = "Bot started.";
                     }
                     break;
-                case "stop":
+                case "bot:isRunning":
+                    result["isRunning"] = Styx.CommonBot.TreeRoot.IsRunning;
+                    break;
+                case "bot:stop":
                     if (!Styx.CommonBot.TreeRoot.IsRunning)
                     {
                         throw new Exception("Bot is not running.");
@@ -251,17 +256,13 @@ namespace com.peec.webservice
                     else
                     {
                         Styx.CommonBot.TreeRoot.Stop();
-                        result.Add("success", "Bot stopped.");
+                        result["success"] = "Bot stopped.";
                     }
                     break;
 
 
             }
-            
-            foreach (string key in result.Keys)
-            {
-                reqData[key] = result[key];
-            }
+            reqData["result"] = result;
 
 
             return reqData;

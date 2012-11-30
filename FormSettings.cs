@@ -28,10 +28,5 @@ namespace com.peec.webservice
                 ((WSSettings)pgSettings.SelectedObject).Save();
         }
 
-        private void button1_Click(object sender, EventArgs e)
-        {
-            ((WSSettings)pgSettings.SelectedObject).restart = true;
-        }
-
     }
 }

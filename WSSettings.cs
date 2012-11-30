@@ -42,19 +42,11 @@ namespace com.peec.webservice
 
         [Setting]
         [Category("Webserver")]
-        [DisplayName("Webserver URL")]
-        [DefaultValue("localhost")]
-        public string weburl { get; set; }
-
-        [Setting]
-        [Category("Webserver")]
         [DisplayName("Webserver PORT")]
-        [DefaultValue(9097)]
+        [DefaultValue(9099)]
         public int webport { get; set; }
 
 
-
-        public bool restart = false;
 
     }
 }
