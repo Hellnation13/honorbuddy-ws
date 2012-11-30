@@ -13,7 +13,6 @@ using System.Threading;
 using Styx.MemoryManagement;
 using System.Web;
 using System.Net;
-using System.Threading;
 using Styx.Common.Helpers;
 using System.Collections.Specialized;
 using System.Text;
