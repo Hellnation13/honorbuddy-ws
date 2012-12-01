@@ -83,19 +83,25 @@ class HB_Me extends HB_NS{
 
 	
 	/**
-	 * Gets player info
+	 * @return array
+	 * @throws HB_JsonRequestException On Error
 	 */
 	public function getPlayerInfo(){
 		return $this->run('me:' . __FUNCTION__);
 	}
 	
 	/**
-	 * 
-	 * @return string
+	 * @return array
+	 * @throws HB_JsonRequestException On Error
 	 */
 	public function getGameStats(){
 		return $this->run('me:' . __FUNCTION__);
 	}
+	
+	/**
+	 * @return array
+	 * @throws HB_JsonRequestException On Error
+	 */
 	public function getItems(){
 		return $this->run('me:' . __FUNCTION__);
 	}
@@ -104,13 +110,25 @@ class HB_Me extends HB_NS{
 
 
 class HB_Bot extends HB_NS{
+	/**
+	 * @return array
+	 * @throws HB_JsonRequestException On Error
+	 */
 	public function stop(){
 		return $this->run('bot:' . __FUNCTION__);
 	}
 	
+	/**
+	 * @return array
+	 * @throws HB_JsonRequestException On Error
+	 */
 	public function start(){
 		return $this->run('bot:' . __FUNCTION__);
 	}
+	/**
+	 * @return array
+	 * @throws HB_JsonRequestException On Error
+	 */
 	public function isRunning(){
 		return $this->run('bot:' . __FUNCTION__);
 	}
@@ -118,10 +136,17 @@ class HB_Bot extends HB_NS{
 
 
 class HB_Game extends HB_NS{
+	/**
+	 * @return array
+	 * @throws HB_JsonRequestException On Error
+	 */
 	public function getScreenshots(){
 		return $this->run('game:' . __FUNCTION__);
 	}
-	
+	/**
+	 * @return array
+	 * @throws HB_JsonRequestException On Error
+	 */
 	public function takeScreenshot(){
 		return $this->run('game:' . __FUNCTION__);
 	}
@@ -130,10 +155,18 @@ class HB_Game extends HB_NS{
 
 
 class HB_Chat extends HB_NS{
+	/**
+	 * @return array
+	 * @throws HB_JsonRequestException On Error
+	 */
 	public function send($msg, $chatType = "SAY", $language = null, $channel = null){
 		return $this->run('chat:' . __FUNCTION__);
 	}
 	
+	/**
+	 * @return array
+	 * @throws HB_JsonRequestException On Error
+	 */
 	public function logs(){
 		return $this->run('chat:' . __FUNCTION__);
 	}
