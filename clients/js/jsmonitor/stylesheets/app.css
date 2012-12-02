@@ -1,0 +1,66 @@
+
+/* Main styles */
+body{
+	background-color: #C0C0C0;
+}
+
+.appContainer{
+	margin-top: 20px;
+}
+.jsm_container{
+	background-color: #fff;
+	border-radius: 15px;
+	-webkit-box-shadow: 0px 3px 16px rgba(0, 0, 0, 0.75);
+	-moz-box-shadow:    0px 3px 16px rgba(0, 0, 0, 0.75);
+	box-shadow:         0px 3px 16px rgba(0, 0, 0, 0.75);
+}
+
+header{
+	padding: 20px 0 20px;
+}
+
+header h1{
+	color: #336699;
+}
+
+footer{
+	margin-top: 20px;
+	padding: 20px 0 10px;
+}
+footer .copyrights{
+	text-align: center;
+}
+
+
+
+/* Status symbols */
+
+.r_status{
+	width: 40px;
+	height: 40px;
+	border-radius: 50px;
+	display: block;
+	float: left; 
+	margin-right: 20px;
+}
+.r_status.fail{ background-color: #CC3300; }
+.r_status.ok{ background-color: #006600; }
+.r_status.unknown{ background-color: #FFCC00; }
+
+
+
+.centered{
+	text-align: center;
+}
+#main{
+	padding: 40px 0 40px;
+}
+.screenshotImage{
+	margin-bottom: 20px;
+	display: block;
+}
+
+.screencontrols{
+	margin-bottom: 10px;
+}
+

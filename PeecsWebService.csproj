@@ -49,6 +49,8 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="HttpServer.cs" />
+    <Compile Include="JSONAPI.cs" />
+    <Compile Include="LuaAPI.cs" />
     <Compile Include="Utils.cs" />
     <Compile Include="Properties\Settings.Designer.cs">
       <AutoGen>True</AutoGen>

@@ -17,7 +17,7 @@ $(function(){
 
 	};
 
-	var api = new HonorbuddyAPI($("#serverInformation").val(), $("#apiKey").val(), $("#apiVersion").val(), 
+	var api = new HonorbuddyAPI($("#serverInformation").val(), $("#apiKey").val(),
 			successCallback, 
 			// Global Error callback..
 			function(data){
@@ -47,9 +47,6 @@ $(function(){
 	$("#serverInformation").change(function(){
 		api.setApiLocation($(this).val());
 		$('.serverHost').text(api.apiLocation);
-	});
-	$("#apiVersion").change(function(){
-		api.apiVersion = $(this).val();
 	});
 	$("#apiKey").change(function(){
 		api.secretKey = $(this).val();

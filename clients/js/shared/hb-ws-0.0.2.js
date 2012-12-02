@@ -1,9 +1,11 @@
 /**
  * Generic API to use with Peecs Webservice.
+ * Usage:
+ * var hb = new HonorbuddyAPI()
  * @version 0.0.2
  * @author Peec
  */
-var HonorbuddyAPI = function(apiLocation, secretKey, apiVersion, successCallback, errorCallback){
+var HonorbuddyAPI = function(apiLocation, secretKey, successCallback, errorCallback){
 
 	var that = this;
 
@@ -11,13 +13,13 @@ var HonorbuddyAPI = function(apiLocation, secretKey, apiVersion, successCallback
 	/* Me API */
 	var me = function(){};
 	me.getPlayerInfo = function(sHandler, eHandler){
-		that.run("me:playerInfo", sHandler, eHandler);
+		return that.run("me:playerInfo", sHandler, eHandler);
 	};
 	me.getGameStats = function(sHandler, eHandler){
-		that.run("me:gameStats", sHandler, eHandler);
+		return that.run("me:gameStats", sHandler, eHandler);
 	};
 	me.getItems = function(sHandler, eHandler){
-		that.run("me:items", sHandler, eHandler);
+		return that.run("me:items", sHandler, eHandler);
 	};
 
 	this.me = me;
@@ -25,13 +27,13 @@ var HonorbuddyAPI = function(apiLocation, secretKey, apiVersion, successCallback
 	/* Bot API*/
 	var bot = function(){};
 	bot.stop = function(sHandler, eHandler){
-		that.run("bot:stop", sHandler, eHandler);
+		return that.run("bot:stop", sHandler, eHandler);
 	};
 	bot.start = function(sHandler, eHandler){
-		that.run("bot:start", sHandler, eHandler);
+		return that.run("bot:start", sHandler, eHandler);
 	};
 	bot.isRunning = function(sHandler, eHandler){
-		that.run("bot:isRunning", sHandler, eHandler);
+		return that.run("bot:isRunning", sHandler, eHandler);
 	};
 	this.bot = bot;
 
@@ -39,17 +41,17 @@ var HonorbuddyAPI = function(apiLocation, secretKey, apiVersion, successCallback
 	/* Game API */
 	var game = function(){};
 	game.getScreenshots = function(sHandler, eHandler){
-		that.run("game:getScreenshots", sHandler, eHandler);
+		return that.run("game:getScreenshots", sHandler, eHandler);
 	};
 	game.takeScreenshot = function(sHandler, eHandler){
-		that.run("game:takeScreenshot", sHandler, eHandler);
+		return that.run("game:takeScreenshot", sHandler, eHandler);
 	};
 	this.game = game;
 
 	/* Chat API */
 	var chat = function(){};
 	chat.send = function(msg, chatType, language, channel, sHandler, eHandler){
-		that.run("chat:send", sHandler, eHandler, {
+		return that.run("chat:send", sHandler, eHandler, {
 			msg: msg,
 			chatType: chatType,
 			language: language,
@@ -57,7 +59,7 @@ var HonorbuddyAPI = function(apiLocation, secretKey, apiVersion, successCallback
 		});
 	};
 	chat.logs = function(EventName, sHandler, eHandler){
-		that.run("chat:logs", sHandler, eHandler, {
+		return that.run("chat:logs", sHandler, eHandler, {
 			EventName: EventName
 		});
 	};
@@ -99,9 +101,20 @@ var HonorbuddyAPI = function(apiLocation, secretKey, apiVersion, successCallback
 					s(data);
 				}
 			});
+			
 		}
 
+
+		return req;
 	};
+	
+	/**
+	 * Tests connection uses bot.isRunning to test.
+	 */
+	this.checkConnection = function(ok, error){
+		bot.isRunning(ok, error);
+	};
+	
 
 	this.setApiLocation = function(loc){
 		this.apiLocation = loc;
@@ -118,7 +131,7 @@ var HonorbuddyAPI = function(apiLocation, secretKey, apiVersion, successCallback
 	/**
 	 * Server api version.
 	 */
-	this.apiVersion = apiVersion;
+	this.apiVersion = "0.0.2";
 	/**
 	 * Global error callback.
 	 */
@@ -139,4 +152,5 @@ var HonorbuddyAPI = function(apiLocation, secretKey, apiVersion, successCallback
 	 */
 	this.onBeforeRun = function(params){};
 
+	
 };
