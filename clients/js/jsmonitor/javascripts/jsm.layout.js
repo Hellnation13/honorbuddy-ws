@@ -29,33 +29,6 @@ JSM.module("Layout", function(Layout, JSM, Backbone, Marionette, $, _) {
 			this.$("[rel=tooltip]").tooltip({
 				placement: 'right'
 			});
-			this.ui.currentStatus.effect("pulsate", { times:3 }, 3000);
-		},
-		statsIntervalLock: false,
-		startTimers: function(){
-			this.statusId = setInterval(this.updateStatus,2000, this);
-		},
-		stopTimers: function(){
-			if (this.statusId){
-				clearInterval(this.intervalId);
-			}
-			
-		},
-		updateStatus: function(that){
-			if (that.statsIntervalLock)return;
-			that.statsIntervalLock = true;
-			JSM.HB.bot.isRunning(function(data){
-				that.statsIntervalLock = false;
-				if (data.result.isRunning){
-					that.ui.currentStatus.attr('class','r_status ok');
-				}else{
-					that.ui.currentStatus.attr('class','r_status fail');
-				}
-			}, function(){
-				that.statsIntervalLock = false;
-				that.ui.currentStatus.attr('class','r_status unknown');
-			});
-			that.ui.currentStatus.effect("pulsate", { times:1 }, 3000);
 		}
 	});
 	
@@ -77,13 +50,15 @@ JSM.module("Layout", function(Layout, JSM, Backbone, Marionette, $, _) {
 		regions: {
 			page: '#connectionPage'
 		},
+		events: {
+			'click .navTo': 'navTo'
+		},
+		navTo: function(){
+			
+		},
 		onRender: function(){
 			this.page.show(new MainFrame());
 
-			JSM.layout.header.currentView.startTimers();
-		},
-		onClose: function(){
-			JSM.layout.header.currentView.stopTimers();
 		}
 	});
 	
@@ -94,37 +69,16 @@ JSM.module("Layout", function(Layout, JSM, Backbone, Marionette, $, _) {
 			playerInfo: '#playerStats',
 			screenshots: '#screenshots'
 		},
-		gameStatIntervalLock: false,
 		onRender: function(){
-			this.updateGameStats(this);
 			this.setScreens();
-			
-			// Timer for game stats
-			this.gameStatsId = setInterval(this.updateGameStats,5000, this);
-		},
-		updateGameStats: function(that){
-			if (that.gameStatIntervalLock)return;
-			
-			console.log("UPDATEGAMESTATS.");
-			that.gameStatIntervalLock = true;
-			JSM.HB.me.getAllStats(function(data){
-				that.gameStatIntervalLock = false;
-				that.playerInfo.show(new MainFrameStats({model: new Backbone.Model(data.result)}));
-			}, function(data){
-				that.gameStatIntervalLock = false;
-				that.playerInfo.close();
-			});
-		},
-		onClose: function(){
-			clearInterval(this.gameStatsId);
-			
+			this.playerInfo.show(new MainFrameStats());
 		},
 		events: {
 			'click #takeScreen': 'takeScreen'
 		},
 		takeScreen: function(e){
 			e.preventDefault();
-			this.screenshots.show(new AjaxLoader({message: "Taking screneshot"}));;
+			this.screenshots.show(new AjaxLoader({message: "Taking screneshot"}));
 			var that = this;
 			JSM.HB.game.takeScreenshot(function(data){
 				that.setScreens();
@@ -133,7 +87,7 @@ JSM.module("Layout", function(Layout, JSM, Backbone, Marionette, $, _) {
 			});
 		},
 		setScreens: function(){
-			this.screenshots.show(new AjaxLoader({message: "Getting screenshots"}));;
+			this.screenshots.show(new AjaxLoader({message: "Getting screenshots"}));
 			var that = this;
 			JSM.HB.game.getScreenshots(function(data){
 				var arr = [];
@@ -153,24 +107,46 @@ JSM.module("Layout", function(Layout, JSM, Backbone, Marionette, $, _) {
 			playerInfo: '#s-playerInfo',
 			gameStats: '#s-gameStats'
 		},
+		events: {
+			'click #player-refresh': 'updatePlayer',
+			'click #game-refresh': 'updateGameStats',
+			
+		},
 		onRender: function(){
-			this.items.show(new MainFrameStatsI({model: this.model}));
-			this.items.show(new MainFrameStatsP({model: this.model}));
-			this.items.show(new MainFrameStatsG({model: this.model}));
+			this.updateGameStats();
+		},
+		updatePlayer: function(){
+			var that = this;
+			this.playerInfo.show(new AjaxLoader({message: "Refreshing player info"}));
+			JSM.HB.me.getPlayerInfo(function(data){
+				that.playerInfo.show(new MainFrameStatsPlayer({model: new Backbone.Model(data.result)}));
+			});
+		},
+		updateGameStats: function(){
+			var that = this;
+			this.gameStats.show(new AjaxLoader({message: "Refreshing game stats"}));
+			JSM.HB.me.getGameStats(function(data){
+				that.gameStats.show(new MainFrameStatsGame({model: new Backbone.Model(data.result)}));
+			});
 		}
 	});
-	
-	var MainFrameStatsI = Marionette.ItemView.extend({
-		template: '#tpl-frame-main-stats-i',
+	var MainFrameStatsPlayer = Marionette.ItemView.extend({
+		template: '#tpl-frame-main-stats-player',
+		onRender: function(){
+			this.$('#nextLevel_bar').css('width', (this.model.get("Experience") / this.model.get("NextLevelExperience") * 100) + "%")
+			this.$('#durability_bar').css('width', (100 - this.model.get("DurabilityPercent")) + "%");
+		}
 	});
-	var MainFrameStatsP = Marionette.ItemView.extend({
-		template: '#tpl-frame-main-stats-p',
+	var MainFrameStatsGame = Marionette.ItemView.extend({
+		template: '#tpl-frame-main-stats-game',
+		onRender: function(){
+			var tot = this.model.get("BGsWon") + this.model.get("BGsLost");
+			
+			var winPercent = tot == 0 ? 0 : parseInt(this.model.get("BGsWon") / tot * 100);
+			
+			this.$('#bg_winPercent').text(winPercent + "%");
+		}
 	});
-	var MainFrameStatsG = Marionette.ItemView.extend({
-		template: '#tpl-frame-main-stats-g',
-		
-	});
-	
 	
 	
 	var ScreenshotView = Marionette.ItemView.extend({

@@ -44,6 +44,14 @@ namespace com.peec.webservice
 
 
 
+        public void debugMsg(string msg)
+        {
+            if (WSSettings.Instance.debug) Logging.Write("[PeecsWS, DEBUG]: " + msg);
+        }
+
+
+
+
         #region Me Specific API
 
         public class MeHandle : APIStub
@@ -110,7 +118,7 @@ namespace com.peec.webservice
                     
                     me["Level"] = Me.Level;
                     me["Experience"] = Me.Experience;
-                    me["Copper"] = Me.Copper;
+                    
                     me["NextLevelExperience"] = Me.NextLevelExperience;
                     me["Durability"] = Me.Durability;
                     me["DurabilityPercent"] = Me.DurabilityPercent;
@@ -122,6 +130,17 @@ namespace com.peec.webservice
                     loc["Z"] = Me.Z;
                     loc["ZoneText"] = Me.ZoneText;
 
+
+                    Hashtable currency = new Hashtable();
+                    currency["Copper"] = Me.Copper;
+                    currency["HonorPoints"] = Styx.WoWInternals.WoWCurrency.GetCurrencyByType(WoWCurrencyType.HonorPoints).Amount;
+                    currency["ConquestPoints"] = Styx.WoWInternals.WoWCurrency.GetCurrencyByType(WoWCurrencyType.ConquestPoints).Amount;
+                    currency["JusticePoints"] = Styx.WoWInternals.WoWCurrency.GetCurrencyByType(WoWCurrencyType.JusticePoints).Amount;
+                    currency["ValorPoints"] = Styx.WoWInternals.WoWCurrency.GetCurrencyByType(WoWCurrencyType.ValorPoints).Amount;
+                    
+
+
+                    me["Currency"] = currency;
                     me["WorldLocation"] = loc;
                 }
                 return me;
@@ -129,9 +148,15 @@ namespace com.peec.webservice
 
             public Hashtable getGameStats(LocalPlayer Me)
             {
+
+                api.debugMsg("Trying to acquireFrame..");
+
                 Hashtable me = new Hashtable();
                 using (Styx.StyxWoW.Memory.AcquireFrame())
                 {
+                    api.debugMsg("AcquireFrame init");
+
+
                     me["XPPerHour"] = Styx.CommonBot.GameStats.XPPerHour;
                     me["TimeToLevel"] = Styx.CommonBot.GameStats.TimeToLevel.TotalSeconds;
                     me["MobsKilled"] = Styx.CommonBot.GameStats.MobsKilled;

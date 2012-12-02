@@ -213,7 +213,6 @@ namespace com.peec.webservice
             }
         }
 
-        
 
 
         private void QueueChat(Styx.CommonBot.Chat.ChatLanguageSpecificEventArgs e)

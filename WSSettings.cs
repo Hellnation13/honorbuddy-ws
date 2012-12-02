@@ -47,5 +47,11 @@ namespace com.peec.webservice
         public int webport { get; set; }
 
 
+        [Setting]
+        [Category("Debugging")]
+        [DisplayName("Debug Peecs Webservice?")]
+        [DefaultValue(false)]
+        public bool debug { get; set; }
+
     }
 }
