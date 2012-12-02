@@ -50,6 +50,32 @@ namespace com.peec.webservice
         {
             public MeHandle(JSONAPI api) : base(api) { }
 
+            /**
+             *  Tries to get all stats, if one stat fails its not added.
+             * 
+             */
+            public Hashtable getAllStats(LocalPlayer Me)
+            {
+                Hashtable me = new Hashtable();
+
+                try
+                {
+                    me["items"] = getItems(Me);
+                }catch(Exception){ }
+                try
+                {
+                    me["playerInfo"] = getPlayerInfo(Me);
+                }
+                catch (Exception) { }
+                try
+                {
+                    me["gameStats"] = getGameStats(Me);
+                }
+                catch (Exception) { }
+
+                return me;
+            }
+
 
             public Hashtable getItems(LocalPlayer Me)
             {

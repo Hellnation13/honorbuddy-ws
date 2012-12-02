@@ -77,10 +77,10 @@
 	<form>
 		<fieldset>
 			<legend>Connection</legend>
-			<label>URL</label>
-			<input type="text" value="http://localhost:9502" id="conUrl" />
-			<label>Secret API Key</label>
-			<input type="text" value="yours33cretk333yyy" id="apiKey" />
+			<label for="conUrl">URL</label>
+			<input type="text" name="conUrl" value="http://localhost:9504" id="conUrl" />
+			<label for="apiKey">Secret API Key</label>
+			<input type="text" name="apiKey" value="yours33cretk333yyy" id="apiKey" />
 		</fieldset>
 	</form>
 </script>
@@ -136,6 +136,22 @@
 	</div>
 </script>
 	
+<script id="tpl-frame-main-stats" type="text/template">
+	<div id="s-items"></div>
+	<div id="s-gameStats"></div>
+	<div id="s-playerInfo"></div>
+</script>	
+<script id="tpl-frame-main-stats-i" type="text/template">
+
+</script>
+<script id="tpl-frame-main-stats-p" type="text/template">
+
+</script>
+<script id="tpl-frame-main-stats-g" type="text/template">
+
+</script>
+
+
 	
 <!-- Api Library -->
 <script src="shared/jquery-1.8.3.min.js" type="text/javascript"></script>

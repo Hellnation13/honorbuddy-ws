@@ -22,6 +22,9 @@ var HonorbuddyAPI = function(apiLocation, secretKey, successCallback, errorCallb
 		return that.run("me:items", sHandler, eHandler);
 	};
 
+	me.getAllStats = function(sHandler, eHandler){
+		return that.run("me:allStats", sHandler, eHandler);
+	};
 	this.me = me;
 
 	/* Bot API*/

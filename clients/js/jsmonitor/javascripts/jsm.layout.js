@@ -31,8 +31,9 @@ JSM.module("Layout", function(Layout, JSM, Backbone, Marionette, $, _) {
 			});
 			this.ui.currentStatus.effect("pulsate", { times:3 }, 3000);
 		},
+		statsIntervalLock: false,
 		startTimers: function(){
-			this.statusId = setInterval(this.updateStatus,2000, this.ui.currentStatus);
+			this.statusId = setInterval(this.updateStatus,2000, this);
 		},
 		stopTimers: function(){
 			if (this.statusId){
@@ -40,17 +41,21 @@ JSM.module("Layout", function(Layout, JSM, Backbone, Marionette, $, _) {
 			}
 			
 		},
-		updateStatus: function(cs){
+		updateStatus: function(that){
+			if (that.statsIntervalLock)return;
+			that.statsIntervalLock = true;
 			JSM.HB.bot.isRunning(function(data){
+				that.statsIntervalLock = false;
 				if (data.result.isRunning){
-					cs.attr('class','r_status ok');
+					that.ui.currentStatus.attr('class','r_status ok');
 				}else{
-					cs.attr('class','r_status fail');
+					that.ui.currentStatus.attr('class','r_status fail');
 				}
 			}, function(){
-				cs.attr('class','r_status unknown');
+				that.statsIntervalLock = false;
+				that.ui.currentStatus.attr('class','r_status unknown');
 			});
-			cs.effect("pulsate", { times:1 }, 3000);
+			that.ui.currentStatus.effect("pulsate", { times:1 }, 3000);
 		}
 	});
 	
@@ -89,14 +94,26 @@ JSM.module("Layout", function(Layout, JSM, Backbone, Marionette, $, _) {
 			playerInfo: '#playerStats',
 			screenshots: '#screenshots'
 		},
+		gameStatIntervalLock: false,
 		onRender: function(){
-			
+			this.updateGameStats(this);
 			this.setScreens();
 			
 			// Timer for game stats
+			this.gameStatsId = setInterval(this.updateGameStats,5000, this);
+		},
+		updateGameStats: function(that){
+			if (that.gameStatIntervalLock)return;
 			
-			this.gameStatsId = setInterval(this.updateGameStats,2000, this.ui.currentStatus);
-			
+			console.log("UPDATEGAMESTATS.");
+			that.gameStatIntervalLock = true;
+			JSM.HB.me.getAllStats(function(data){
+				that.gameStatIntervalLock = false;
+				that.playerInfo.show(new MainFrameStats({model: new Backbone.Model(data.result)}));
+			}, function(data){
+				that.gameStatIntervalLock = false;
+				that.playerInfo.close();
+			});
 		},
 		onClose: function(){
 			clearInterval(this.gameStatsId);
@@ -129,15 +146,39 @@ JSM.module("Layout", function(Layout, JSM, Backbone, Marionette, $, _) {
 		}
 	});
 	
+	var MainFrameStats = Marionette.Layout.extend({
+		template: '#tpl-frame-main-stats',
+		regions: {
+			items: '#s-items',
+			playerInfo: '#s-playerInfo',
+			gameStats: '#s-gameStats'
+		},
+		onRender: function(){
+			this.items.show(new MainFrameStatsI({model: this.model}));
+			this.items.show(new MainFrameStatsP({model: this.model}));
+			this.items.show(new MainFrameStatsG({model: this.model}));
+		}
+	});
+	
+	var MainFrameStatsI = Marionette.ItemView.extend({
+		template: '#tpl-frame-main-stats-i',
+	});
+	var MainFrameStatsP = Marionette.ItemView.extend({
+		template: '#tpl-frame-main-stats-p',
+	});
+	var MainFrameStatsG = Marionette.ItemView.extend({
+		template: '#tpl-frame-main-stats-g',
+		
+	});
+	
+	
+	
 	var ScreenshotView = Marionette.ItemView.extend({
 		template: '#tpl-screenshot',
 		templateHelpers: {
 			getFullUrl: function(url){
 				return JSM.HB.apiLocation + url;
 			}
-		},
-		onRender: function(){
-			
 		}
 	});
 	var ScreenshotsView = Marionette.CollectionView.extend({

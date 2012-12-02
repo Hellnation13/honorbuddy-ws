@@ -65,6 +65,9 @@ $(function(){
 		case "me:items":
 			api.me.getItems();
 			break;
+		case "me:allStats":
+			api.me.getAllStats();
+			break;
 		case "bot:stop":
 			api.bot.stop();
 			break;

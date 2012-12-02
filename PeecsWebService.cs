@@ -98,7 +98,6 @@ namespace com.peec.webservice
 
             chatLogs.Clear();
 
-            
 
         }
 
@@ -320,6 +319,9 @@ namespace com.peec.webservice
                     break;
                 case "me:items":
                     result = reqHandler.Me.getItems(Me);
+                    break;
+                case "me:allStats":
+                    result = reqHandler.Me.getAllStats(Me);
                     break;
                 case "chat:send":
                     LuaAPI.SendChatMessage(
