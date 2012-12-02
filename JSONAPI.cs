@@ -135,7 +135,7 @@ namespace com.peec.webservice
                     currency["ConquestPoints"] = Styx.WoWInternals.WoWCurrency.GetCurrencyByType(WoWCurrencyType.ConquestPoints).Amount;
                     currency["JusticePoints"] = Styx.WoWInternals.WoWCurrency.GetCurrencyByType(WoWCurrencyType.JusticePoints).Amount;
                     currency["ValorPoints"] = Styx.WoWInternals.WoWCurrency.GetCurrencyByType(WoWCurrencyType.ValorPoints).Amount;
-                    
+
 
 
                     me["Currency"] = currency;
