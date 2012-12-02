@@ -113,9 +113,7 @@ namespace com.peec.webservice
             public Hashtable getPlayerInfo(LocalPlayer Me)
             {
                 Hashtable me = new Hashtable();
-                using (Styx.StyxWoW.Memory.AcquireFrame())
-                {
-                    
+                
                     me["Level"] = Me.Level;
                     me["Experience"] = Me.Experience;
                     
@@ -142,21 +140,14 @@ namespace com.peec.webservice
 
                     me["Currency"] = currency;
                     me["WorldLocation"] = loc;
-                }
                 return me;
             }
 
             public Hashtable getGameStats(LocalPlayer Me)
             {
 
-                api.debugMsg("Trying to acquireFrame..");
-
                 Hashtable me = new Hashtable();
-                using (Styx.StyxWoW.Memory.AcquireFrame())
-                {
-                    api.debugMsg("AcquireFrame init");
-
-
+                    
                     me["XPPerHour"] = Styx.CommonBot.GameStats.XPPerHour;
                     me["TimeToLevel"] = Styx.CommonBot.GameStats.TimeToLevel.TotalSeconds;
                     me["MobsKilled"] = Styx.CommonBot.GameStats.MobsKilled;
@@ -165,8 +156,6 @@ namespace com.peec.webservice
                     me["HonorPerHour"] = Styx.CommonBot.GameStats.HonorPerHour;
                     me["BGsWon"] = Styx.CommonBot.GameStats.BGsWon;
                     me["BGsLost"] = Styx.CommonBot.GameStats.BGsLost;
-
-                }
 
                 return me;
             }
