@@ -39,15 +39,12 @@ namespace com.peec.webservice
             new FormSettings().ShowDialog();
         }
 
-        
-        static HttpServer web;
-        private List<ChatLog> chatLogs;
-        private String WoWPath;
 
-        // Configuration 
+        private Server server;
+        private List<ChatLog> chatLogs;
+
         private string apiKey;
-        private int webservicePort;
-		
+        private String WoWPath;
         
 
 
@@ -72,17 +69,20 @@ namespace com.peec.webservice
 
             Logging.Write("Init : WebService");
 
-            startServer();
 
+            this.apiKey = WSSettings.Instance.apikey;
             WoWPath = Path.GetDirectoryName(Styx.StyxWoW.Memory.Process.MainModule.FileName);
 
 
+
+
+            server = new Server(WSSettings.Instance.webport, WoWPath + "\\Screenshots\\", checkRequestAccess, parseResult);
+
         }
+
+
         public override void Dispose()
         {
-            base.Dispose();
-
-            stopServer();
             Chat.Say -= QueueChat;
             Chat.Yell -= QueueChat;
             Chat.Whisper -= QueueChat;
@@ -98,7 +98,8 @@ namespace com.peec.webservice
 
             chatLogs.Clear();
 
-
+            server.Dispose();
+            server = null;
         }
 
         public void OnStart(EventArgs args)
@@ -118,153 +119,6 @@ namespace com.peec.webservice
         }
 
 
-        public void startServer()
-        {
-
-            this.apiKey = WSSettings.Instance.apikey;
-            this.webservicePort = WSSettings.Instance.webport;
-
-            if (WSSettings.Instance.enableWebserver)
-            {
-                
-
-                try
-                {
-                    if (!HttpListener.IsSupported)
-                    {
-                        Logging.Write("HttpListener not supported.");
-                        return;
-                    }
-                    web = new HttpServer(20);
-                    
-                    web.ProcessRequest -= OnRequest;
-                    web.ProcessRequest += OnRequest;
-                    web.Start(webservicePort);
-                    Logging.Write(string.Format("Listening on http://*:{0}/ for JSON request commands.. ", webservicePort));
-                    Logging.Write(string.Format("USING SECRET API KEY: {0}", apiKey));
-
-                }
-                catch (Exception e)
-                {
-
-                    Logging.Write(string.Format("Error {0} stack: {1}", e.Message, e.StackTrace));
-                }
-
-            }
-            else
-            {
-                stopServer();
-            }
-        }
-
-        public void stopServer()
-        {
-            if (web != null)
-            {
-                web.Stop();
-                while (web.isListening())
-                {
-                    Thread.Sleep(1000);
-                    Logging.Write("Waiting on webserver to stop.");
-                }
-            }
-        }
-
-
-        
-
-
-        public void OnRequest(HttpListenerContext ctx)
-        {
-            string result = "{}";
-            byte[] buffer;
-            HttpListenerResponse response = ctx.Response;
-
-            // Check access..
-            try
-            {
-                checkRequestAccess(ctx.Request.QueryString);
-            }
-            catch (Exception e)
-            {
-                response.ContentType = "application/json";
-                response.StatusCode = 400;
-                Hashtable data = new Hashtable();
-                data["ok"] = false;
-                data["error"] = e.Message;
-                data["result"] = new Hashtable();
-                Logging.Write(string.Format("Error {0} stack: {1}", e.Message, e.StackTrace));
-                result = JSON.JsonEncode(data);
-                HttpServer.SendResponse(response, result);
-                return;
-            }
-
-
-
-            // Image
-            string img = ctx.Request.QueryString.Get("img");
-            if (img != null)
-            {
-                response.StatusCode = 200;
-                img = WoWPath + "\\Screenshots\\" + img;
-                    
-                response.ContentType = "image/jpeg";
-                buffer = System.IO.File.ReadAllBytes(img);
-                HttpServer.SendResponse(response, buffer);
-                return;
-            }
-
-            // Json
-
-            response.ContentType = "application/json";
-            response.ContentEncoding = Encoding.UTF8;
-
-            try
-            {
-
-                Hashtable res = parseResult(ctx.Request.QueryString);
-                if (res != null)
-                {
-                    res["ok"] = true;
-                }
-                result = JSON.JsonEncode(res);
-                
-                if (res != null && result != null)
-                {
-                    response.StatusCode = 200;
-                }
-                else
-                {
-                    throw new Exception("Request is invalid.");
-                }
-                
-            }
-            catch (Exception e)
-            {
-                response.StatusCode = 400;
-
-                Hashtable data = new Hashtable();
-                data["ok"] = false;
-                data["error"] = e.Message;
-                data["result"] = new Hashtable();
-                result = JSON.JsonEncode(data);
-            }
-
-            // Support JSONP.
-            string callback = ctx.Request.QueryString.Get("callback");
-            if (callback != null)
-            {
-                result = callback+"("+result+")";
-                response.ContentType = "application/javascript";
-                response.StatusCode = 200; // jsonp must have 200 code :(
-            }
-
-            HttpServer.SendResponse(response, result);
-        }
-
-        
-
-
         
 		public override void Pulse(){
 
@@ -276,30 +130,15 @@ namespace com.peec.webservice
             }
         }
 
-        
 
-
-        public void checkRequestAccess(NameValueCollection res)
-        {
-            if ((string)res["secretKey"] == "" || (string)res["secretKey"] != this.apiKey)
-            {
-                Logging.Write("Response is invalid. Must be of type JSON and include \"secretKey\" with the corresponding secret key.");
-                throw new Exception("Could not authenticate this key.");
-            }
-            if ((string)res["apiVersion"] == "" || (string)res["apiVersion"] != this.Version.ToString())
-            {
-                Logging.Write("Response is invalid. Must be of type JSON and include correct \"apiVersion\". Current API VERSION is " + Version.ToString());
-                throw new Exception(string.Format("Wrong API version of client ({0}), current server API version is: {1}.", res["apiVersion"], Version.ToString()));
-            }
-        }
 
         public Hashtable parseResult(NameValueCollection res)
         {
 
-            
+
 
             Hashtable reqData = new Hashtable();
-            
+
             reqData["secretKey"] = this.apiKey;
             reqData["apiVersion"] = this.Version.ToString();
 
@@ -325,9 +164,9 @@ namespace com.peec.webservice
                     break;
                 case "chat:send":
                     LuaAPI.SendChatMessage(
-                        LuaAPI.cs(res["msg"]), 
+                        LuaAPI.cs(res["msg"]),
                         LuaAPI.cs(res["chatType"]),
-                        LuaAPI.cs(res["language"]), 
+                        LuaAPI.cs(res["language"]),
                         LuaAPI.cs(res["channel"])
                         );
                     break;
@@ -349,7 +188,7 @@ namespace com.peec.webservice
                 case "bot:stop":
                     result = reqHandler.Bot.stop();
                     break;
-                
+
 
 
             }
@@ -357,6 +196,21 @@ namespace com.peec.webservice
 
 
             return reqData;
+        }
+
+
+        public void checkRequestAccess(NameValueCollection res)
+        {
+            if ((string)res["secretKey"] == "" || (string)res["secretKey"] != this.apiKey)
+            {
+                Logging.Write("Response is invalid. Must be of type JSON and include \"secretKey\" with the corresponding secret key.");
+                throw new Exception("Could not authenticate this key.");
+            }
+            if ((string)res["apiVersion"] == "" || (string)res["apiVersion"] != this.Version.ToString())
+            {
+                Logging.Write("Response is invalid. Must be of type JSON and include correct \"apiVersion\". Current API VERSION is " + Version.ToString());
+                throw new Exception(string.Format("Wrong API version of client ({0}), current server API version is: {1}.", res["apiVersion"], Version.ToString()));
+            }
         }
 
         

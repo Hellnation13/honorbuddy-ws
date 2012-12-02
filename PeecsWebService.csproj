@@ -48,6 +48,7 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Server.cs" />
     <Compile Include="HttpServer.cs" />
     <Compile Include="JSONAPI.cs" />
     <Compile Include="LuaAPI.cs" />
